@@ -1,7 +1,7 @@
 name = "BnGStructs"
 uuid = "764f5799-4fa8-443f-b488-b719b6ff37e3"
 authors = ["Xijiang Yu <xijiang@users.noreply.github.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
