@@ -11,10 +11,8 @@ BnGStructs.jl is a Julia package providing efficient data structures for represe
 ## Installation
 Until registered, install via path or Git URL:
 ```julia
-using Pkg
-Pkg.add(path="/path/to/BnGStructs")
-# or
-Pkg.add(url="https://github.com/JuliaBnG/BnGStructs.jl")
+] #to enter pkg environment
+add BnGStructs
 ```
 
 ## Usage Example
@@ -29,21 +27,9 @@ gt = hap2id(hap)
 
 # Access underlying BitMatrix
 gtmat = gt.gt
-```
 
-## Project Structure
-```
-BnGStructs/
-  Project.toml
-  src/
-    BnGStructs.jl
-    genotypes.jl
-    haplotypes.jl
-    hap-gt.jl
-    ...
-  LICENSE
-  README.md
-  .gitignore
+# Define a Cattle population
+cattle = Cattle(1000)
 ```
 
 ## Requirements for Registration
