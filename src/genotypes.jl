@@ -29,3 +29,21 @@ function Genotype(nid::Int, nas::Int)
     gt = falses(64 * cld(nid, 64), nas) # as a chunk in BitMatrix is 64-bit UInt64
     return Genotype(nid, nas, gt)
 end
+
+"""
+    Genotype(gt::BitMatrix)
+Create a Genotype struct from a BitMatrix `gt`. The number of individuals and
+alleles are inferred from the size of `gt`. Only the valid part of `gt`
+(defined by `nid` and `nas`) is copied.
+"""
+function Genotype(gt::BitMatrix)
+    nid, nas = size(gt)
+    tg = Genotype(nid, nas)
+    tg.gt[1:nid, 1:nas] = gt[1:nid, 1:nas] # copy only the valid part
+    return tg
+end
+
+function Base.show(io::IO, gt::Genotype)
+    println(io, "Genotype with $(gt.nid) individuals and $(gt.nas) alleles")
+    show(io, gt.gt[1:gt.nid, 1:gt.nas]) # show only the valid part
+end

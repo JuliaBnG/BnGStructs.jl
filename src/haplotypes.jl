@@ -28,3 +28,16 @@ function Haplotype(nlc::Int, nhp::Int)
     gt = falses(64 * cld(nlc, 64), nhp) # as a chunk in BitMatrix is 64-bit UInt64
     return Haplotype(nlc, nhp, gt)
 end
+
+"""
+    Haplotype(gt::BitMatrix)
+Create a Haplotype struct from a BitMatrix `gt`. The number of loci and
+haplotypes are inferred from the size of `gt`. Only the valid part of `gt`
+(defined by `nlc` and `nhp`) is copied.
+"""
+function Haplotype(gt::BitMatrix)
+    nlc, nhp = size(gt)
+    th = Haplotype(nlc, nhp)
+    th.gt[1:nlc, 1:nhp] = gt # copy only the valid part
+    return th
+end
