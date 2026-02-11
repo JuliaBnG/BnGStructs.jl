@@ -62,7 +62,6 @@ end
         μ::Float64   # population mean
         σₐ::Float64  # TBV std
         da::Distribution # QTL additive effect distribution, e.g., Normal()
-        rev::Bool        # default true, higher the better
     end
 
 Pure additive trait.
@@ -76,7 +75,6 @@ struct aTrait <: Trait
     μ::Float64   # population mean
     σₐ::Float64  # TBV std
     da::Distribution # QTL additive effect distribution, e.g., Normal()
-    rev::Bool        # default true, higher the better
 end
 
 """
@@ -89,7 +87,6 @@ end
         QTL::Symbol
         σₐ::Float64  # TBV std
         da::Distribution  # e.g., Normal()
-        rev::Bool    # default true, higher the better
     end
 Struct for threshold traits. The number of phenotype categories equals the
 length of threshold + 1. The underlying genotype is continuous. The phenotype
@@ -105,7 +102,6 @@ struct tTrait <: AbstractTrait
     QTL::Symbol
     σₐ::Float64  # TBV std
     da::Distribution  # e.g., Normal()
-    rev::Bool    # default true, higher the better
 end
 
 """
@@ -118,7 +114,6 @@ end
         μ = 0.0,
         σₐ = 1.0,
         da = Normal(),
-        rev = true,
     )
 Helper function to create a Trait object. It checks the validity of the input
 parameters and returns a Trait object. Refer to the `Trait` struct for the
@@ -133,7 +128,6 @@ function Trait(
     μ = 0.0,
     σₐ = 1.0,
     da = Normal(),
-    rev = true,
 )
     occursin(r"^[[:alpha:]_\p{L}][\p{L}\p{N}_]*$", name) ||
         error("Name must be valid for a data frame column name")
@@ -141,7 +135,7 @@ function Trait(
     age ≥ 0 || error("Age must be non negative")
     0.0 < h² ≤ 1.0 || error("h² must be in (0, 1]")
     σₐ > 0 || error("σₐ must be positive")
-    aTrait(name, sex, age, h², QTL, μ, σₐ, da, rev)
+    aTrait(name, sex, age, h², QTL, μ, σₐ, da)
 end
 
 """
@@ -154,7 +148,6 @@ end
         QTL = :qtl,
         σₐ = 1.0,
         da = Normal(),
-        rev = true,
     )
 Helper function to create a threshold `tTrait`. It checks the validity of the
 input parameters and returns a `tTrait`. Refer to the `tTrait` struct for the
@@ -175,7 +168,6 @@ function Trait(
     h² = 0.25,
     QTL = :qtl,
     da = Normal(),
-    rev = true,
 )
     occursin(r"^[[:alpha:]_\p{L}][\p{L}\p{N}_]*$", name) ||
         error("Name must be valid for a data frame column name")
@@ -186,7 +178,7 @@ function Trait(
     weight ./= sum(weight)
     σₚ = sqrt(1.0 / h²)
     threshold = map(x -> quantile(Normal(0, σₚ), x), cumsum(weight[1:(end-1)]))
-    tTrait(name, threshold, sex, age, h², QTL, 1.0, da, rev)
+    tTrait(name, threshold, sex, age, h², QTL, 1.0, da)
 end
 
 function Base.show(io::IO, trt::AbstractTrait)
@@ -203,9 +195,8 @@ function Base.show(io::IO, trt::AbstractTrait)
     end
     println(io, "      Express age: $(trt.age)")
     println(io, "     Heritability: $(trt.h²)")
-    isa(trt, Trait) && println(io, "  Population mean: $(trt.μ)")
+    isa(trt, Trait) && println(io, "  Init. pop. mean: $(trt.μ)")
     println(io, "     QTL set name: $(trt.QTL)")
     println(io, "         std(TBV): $(trt.σₐ)")
     println(io, " QTL add. distri.: $(trt.da)")
-    print(io, "Higher the better: $(trt.rev)")
 end
