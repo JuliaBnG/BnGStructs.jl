@@ -5,11 +5,14 @@ include("misc.jl")
 include("haplotypes.jl")
 include("genotypes.jl")
 include("species.jl")
-#include("trait.jl")
+include("trait.jl")
 # transformations between them
 include("hap-gt.jl")
+# SNP sets
+include("snpset.jl")
 
-export Haplotype, Genotype, hap2id, id2hap, Species#, Trait
+export Haplotype, Genotype, hap2id, id2hap, Species
 export Cat, Cattle, Chicken, Dog, GenericSpecies, Goat, Horse, Pig, Rabbit, Sheep
+export Trait, SNPSet
 
 end # module BnGStructs

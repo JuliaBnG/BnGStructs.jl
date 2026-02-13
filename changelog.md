@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.2 (2026-02-13)
+
+- Bumped package version to 0.2.2
+- Added `snpset.jl` to define SNP sets.
+- Enabled `trait.jl` for trait definitions.
+
 ## 0.2.0 (2025-11-12)
 
 - Bumped package version to 0.2.0.
