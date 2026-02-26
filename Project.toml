@@ -1,6 +1,6 @@
 name = "BnGStructs"
 uuid = "764f5799-4fa8-443f-b488-b719b6ff37e3"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Xijiang Yu <xijiang@users.noreply.github.com>"]
 
 [deps]
