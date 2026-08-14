@@ -125,3 +125,83 @@ end
     @test sprint(show, Haplotype(10, 2)) == "Haplotype with 10 loci and 2 haplotypes"
     @test sprint(show, Genotype(10, 2)) == "Genotype with 10 individuals and 2 alleles"
 end
+
+@testset "VariantMap and LocusSet" begin
+    chrs = Int8[1, 1, 1, 2, 2]
+    pos = UInt32[100, 200, 300, 150, 250]
+    ref = ['A', 'C', 'G', 'T', 'A']
+    alt = ['G', 'T', 'A', 'C', 'G']
+    frq = Float32[0.1, 0.2, 0.5, 0.4, 0.3]
+
+    vm = VariantMap(chrs, pos, ref, alt, frq)
+    @test length(vm) == 5
+    @test size(vm) == (5,)
+    @test vm[1].pos == 100
+    @test vm[1].ref == 'A'
+    @test vm[1].frq == 0.1f0
+
+    sub_vm = vm[[1, 3, 5]]
+    @test length(sub_vm) == 3
+    @test sub_vm.pos == UInt32[100, 300, 250]
+
+    # Locus sets (Chip markers, QTLs, Reference loci)
+    chip = LocusSet("50kChip", [1, 2, 4])
+    qtl_set = LocusSet("10kQTL", [2, 3, 5])
+    ref_set = LocusSet("RefPanel", [1, 5])
+
+    @test length(chip) == 3
+    @test 2 in chip
+    @test !(3 in chip)
+    @test length(qtl_set) == 3
+    @test 5 in qtl_set
+    @test sprint(show, chip) == "LocusSet \"50kChip\" with 3 loci"
+
+    @test_throws ArgumentError VariantMap([1, 2], [100], ['A', 'C'], ['G', 'T'])
+    @test_throws ArgumentError LocusSet("Bad", [0, 1])
+    @test_throws ArgumentError LocusSet("Unsorted", [2, 1])
+    @test_throws ArgumentError LocusSet("Duplicate", [1, 1])
+end
+
+@testset "TraitQTL, MultiTraitQTL and TBV" begin
+    # 4 loci, 2 individuals (4 haplotypes)
+    hps = Haplotype(4, 4)
+    # Individual 1: hap1 = [1, 0, 1, 0], hap2 = [1, 1, 0, 0] -> dosages = [2, 1, 1, 0]
+    # Individual 2: hap3 = [0, 0, 0, 0], hap4 = [0, 1, 1, 1] -> dosages = [0, 1, 1, 1]
+    hps.gt[1, 1] = true; hps.gt[3, 1] = true
+    hps.gt[1, 2] = true; hps.gt[2, 2] = true
+    hps.gt[2, 4] = true; hps.gt[3, 4] = true; hps.gt[4, 4] = true
+
+    # Trait 1: QTL at loci 1 and 2 with effects [0.5, -1.0]
+    qtl1 = TraitQTL("Trait1", [1, 2], [0.5, -1.0])
+    @test length(qtl1) == 2
+    tbv1 = tbv(hps, qtl1)
+    # Ind 1: 2*0.5 + 1*(-1.0) = 0.0
+    # Ind 2: 0*0.5 + 1*(-1.0) = -1.0
+    @test tbv1 ≈ [0.0, -1.0]
+
+    # Same with Genotype
+    gt = hap2id(hps)
+    @test tbv(gt, qtl1) ≈ [0.0, -1.0]
+
+    # Trait 2: QTL at loci 2 and 3 with additive [2.0, 3.0] and dominance on locus 2 [0.5, 0.0]
+    qtl2 = TraitQTL("Trait2", [2, 3], [2.0, 3.0]; dominance=[0.5, 0.0])
+    tbv2 = tbv(hps, qtl2)
+    # Ind 1: locus2 (dosage 1) -> 1*2.0 + 0.5 = 2.5; locus3 (dosage 1) -> 1*3.0 = 3.0. Total = 5.5
+    # Ind 2: locus2 (dosage 1) -> 1*2.0 + 0.5 = 2.5; locus3 (dosage 1) -> 1*3.0 = 3.0. Total = 5.5
+    @test tbv2 ≈ [5.5, 5.5]
+    @test tbv(gt, qtl2) ≈ [5.5, 5.5]
+
+    # MultiTraitQTL combining Trait 1 and Trait 2
+    mqtl = MultiTraitQTL([qtl1, qtl2])
+    @test length(mqtl.trait_names) == 2
+    @test mqtl.loci == Int32[1, 2, 3] # union of QTL loci
+    @test size(mqtl.additive) == (3, 2)
+
+    tbv_multi = tbv(hps, mqtl)
+    @test size(tbv_multi) == (2, 2)
+    @test tbv_multi[:, 1] ≈ tbv1
+    @test tbv_multi[:, 2] ≈ tbv2
+
+    @test tbv(gt, mqtl) ≈ tbv_multi
+    @test_throws ArgumentError TraitQTL("Duplicate", [1, 1], [0.1, 0.2])
+end

@@ -6,11 +6,11 @@ population-genetics workflows.
 
 ## Installation
 
-Until the package is registered, install it directly from GitHub:
+Install BnGStructs from the Julia General registry:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/JuliaBnG/BnGStructs.jl")
+Pkg.add("BnGStructs")
 ```
 
 ## Quick start
@@ -60,3 +60,17 @@ trait = Trait("DiseaseStatus", [0.95, 0.05]; h²=0.15)
 
 Weights must be finite, positive, and contain at least two categories. They are
 normalized internally without modifying the input vector.
+
+## Variant maps and QTL architectures
+
+`VariantMap` stores per-locus metadata, while `LocusSet` names a sorted, unique
+subset of its one-based locus indices. `TraitQTL` and `MultiTraitQTL` represent
+additive and optional dominance effects; `tbv` calculates true breeding values
+from a `Haplotype` or `Genotype`:
+
+```julia
+map = VariantMap([1, 1], [100, 200], ['A', 'C'], ['G', 'T'])
+panel = LocusSet("Example panel", [1, 2])
+qtl = TraitQTL("Example trait", [1], [0.5])
+values = tbv(haplotypes, qtl)
+```

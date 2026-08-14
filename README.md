@@ -11,10 +11,10 @@ BnGStructs.jl is a Julia package providing efficient data structures for represe
 - Type-stable, memory-efficient, and compatible with multi-threaded operations
 
 ## Installation
-Until registered, install via path or Git URL:
+Install from the Julia General registry:
 ```julia
 ] #to enter pkg environment
-add https://github.com/JuliaBnG/BnGStructs.jl
+add BnGStructs
 ```
 
 ## Usage Example

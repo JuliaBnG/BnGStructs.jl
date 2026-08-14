@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 - Made species and trait storage type-stable and added validated species accessors.
 - Added `AbstractMatrix` support and concise display output for haplotypes and genotypes.
 - Hardened threshold-trait input validation and preserved caller-provided weights.
+- Added variant maps, sorted locus sets, QTL architectures, and true breeding
+  value calculations.
 
 ## 0.2.2 (2026-02-13)
 

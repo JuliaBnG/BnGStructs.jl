@@ -20,3 +20,10 @@ Pages = ["species.jl"]
 Modules = [BnGStructs]
 Pages = ["trait.jl", "snpset.jl"]
 ```
+
+## Variant maps and QTL architectures
+
+```@autodocs
+Modules = [BnGStructs]
+Pages = ["variantmap.jl", "locusset.jl", "qtl.jl"]
+```
