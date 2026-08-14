@@ -13,6 +13,7 @@ include("snpset.jl")
 
 export Haplotype, Genotype, hap2id, id2hap, Species
 export Cat, Cattle, Chicken, Dog, GenericSpecies, Goat, Horse, Pig, Rabbit, Sheep
-export AbstractTrait, Trait, tTrait, SNPSet
+export AbstractTrait, Trait, aTrait, tTrait, SNPSet
+export name, nid, chromosome, M, total_bp, cbp
 
 end # module BnGStructs

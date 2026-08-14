@@ -11,25 +11,44 @@ abstract type Species end
 
 """
     struct GenericSpecies <: Species
-        name::AbstractString
+        name::String
         nid::Int32
-        chromosome::Vector{UInt32} # Changed to UInt32
-        M::UInt32 # Changed to UInt32
+        chromosome::Vector{UInt32}
+        M::UInt32
     end
 
 Struct for a generic species with the given name, population size, and
 chromosome lengths.
 """
 struct GenericSpecies <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32} # Changed to UInt32
     M::UInt32 # Changed to UInt32
 end
 
 """
+    GenericSpecies(name::AbstractString, nid::Integer, chromosome::AbstractVector{<:Integer}; M::Integer=100_000_000)
+
+Construct a `GenericSpecies` with `name`, population size `nid`, chromosome lengths `chromosome` (in bp),
+and base pairs per Morgan `M`.
+"""
+function GenericSpecies(
+    name::AbstractString,
+    nid::Integer,
+    chromosome::AbstractVector{<:Integer};
+    M::Integer=100_000_000,
+)
+    nid ≤ 0 && error("nid must be positive")
+    isempty(chromosome) && error("at least one chromosome length is required")
+    all(chromosome .> 0) || error("chromosome lengths must be positive")
+    M > 0 || error("M must be positive")
+    return GenericSpecies(String(name), Int32(nid), UInt32.(chromosome), UInt32(M))
+end
+
+"""
     struct Cattle <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32} # Changed to UInt32
         M::UInt32 # Changed to UInt32
@@ -38,19 +57,20 @@ end
 Struct for cattle species.
 """
 struct Cattle <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32} # Changed to UInt32
     M::UInt32 # Changed to UInt32
 end
 
 """
-    Cattle(nid::Int)
+    Cattle(nid::Integer; M::Integer = 100_000_000)
 Helper function to create a cattle species struct. The chromosome lengths are
 from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000003055.6/
 """
-function Cattle(nid::Int)
+function Cattle(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         158_534_110,
         136_231_102,
@@ -83,12 +103,12 @@ function Cattle(nid::Int)
         51_098_607,
         # 148_823_899, #X
     ]
-    Cattle("BosTau", nid, clng, 100_000_000)
+    Cattle("BosTau", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Sheep <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32} # Changed to UInt32
         M::UInt32 # Changed to UInt32
@@ -96,19 +116,20 @@ end
 Struct for sheep species.
 """
 struct Sheep <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32} # Changed to UInt32
     M::UInt32 # Changed to UInt32
 end
 
 """
-    Sheep(nid::Int)
+    Sheep(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Sheep` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000298735.2/
 """
-function Sheep(nid::Int)
+function Sheep(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         275_406_953,
         248_966_461,
@@ -138,12 +159,12 @@ function Sheep(nid::Int)
         44_047_080,
         # 135_185_801, #X
     ]
-    return Sheep("OviAri", nid, clng, 100_000_000)
+    return Sheep("OviAri", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Chicken <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32} # Changed to UInt32
         M::UInt32 # Changed to UInt32
@@ -151,19 +172,20 @@ end
 Struct for chicken species.
 """
 struct Chicken <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32} # Changed to UInt32
     M::UInt32 # Changed to UInt32
 end
 
 """
-    Chicken(nid::Int)
+    Chicken(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Chicken` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_016699485.2/
 """
-function Chicken(nid::Int)
+function Chicken(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         196_449_156,
         149_539_284,
@@ -208,12 +230,12 @@ function Chicken(nid::Int)
         # 86_044_486, #Z
         # 16_784, #MT
     ]
-    return Chicken("GalGal", nid, clng, 100_000_000)
+    return Chicken("GalGal", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Pig <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32} # Changed to UInt32
         M::UInt32 # Changed to UInt32
@@ -221,19 +243,20 @@ end
 Struct for pig species.
 """
 struct Pig <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32} # Changed to UInt32
     M::UInt32 # Changed to UInt32
 end
 
 """
-    Pig(nid::Int)
+    Pig(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Pig` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000003025.6/
 """
-function Pig(nid::Int)
+function Pig(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         274_330_532,
         151_935_994,
@@ -256,12 +279,12 @@ function Pig(nid::Int)
         #125_939_595, #X
         #43_547_828,  #Y
     ]
-    return Pig("SusScr", nid, clng, 100_000_000)
+    return Pig("SusScr", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Goat <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32}
         M::UInt32
@@ -269,19 +292,20 @@ end
 Struct for goat species.
 """
 struct Goat <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32}
     M::UInt32
 end
 
 """
-    Goat(nid::Int)
+    Goat(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Goat` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_001704415.2/
 """
-function Goat(nid::Int)
+function Goat(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         157_403_528,
         136_510_947,
@@ -313,12 +337,12 @@ function Goat(nid::Int)
         44_672_302,
         51_332_696,
     ]
-    return Goat("CapHir", nid, clng, 100_000_000)
+    return Goat("CapHir", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Horse <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32}
         M::UInt32
@@ -326,19 +350,20 @@ end
 Struct for horse species.
 """
 struct Horse <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32}
     M::UInt32
 end
 
 """
-    Horse(nid::Int)
+    Horse(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Horse` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_002863925.1/
 """
-function Horse(nid::Int)
+function Horse(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         188_260_577,
         121_350_024,
@@ -373,12 +398,12 @@ function Horse(nid::Int)
         26_001_039,
         #128_206_784,
     ]
-    return Horse("EquCab", nid, clng, 100_000_000)
+    return Horse("EquCab", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Rabbit <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32}
         M::UInt32
@@ -386,19 +411,20 @@ end
 Struct for rabbit species.
 """
 struct Rabbit <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32}
     M::UInt32
 end
 
 """
-    Rabbit(nid::Int)
+    Rabbit(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Rabbit` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000003625.3/
 """
-function Rabbit(nid::Int)
+function Rabbit(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         194_850_757,
         174_332_312,
@@ -423,12 +449,12 @@ function Rabbit(nid::Int)
         15_578_276,
         #111_700_775,
     ]
-    return Rabbit("OryCun", nid, clng, 100_000_000)
+    return Rabbit("OryCun", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Cat <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32}
         M::UInt32
@@ -436,19 +462,20 @@ end
 Struct for cat species.
 """
 struct Cat <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32}
     M::UInt32
 end
 
 """
-    Cat(nid::Int)
+    Cat(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Cat` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_018350175.1/
 """
-function Cat(nid::Int)
+function Cat(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         239_360_788,
         169_471_080,
@@ -470,12 +497,12 @@ function Cat(nid::Int)
         52_190_560, # F1-2
         #127_149_045, #X
     ]
-    return Cat("FelCat", nid, clng, 100_000_000)
+    return Cat("FelCat", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 """
     struct Dog <: Species
-        name::AbstractString
+        name::String
         nid::Int32
         chromosome::Vector{UInt32}
         M::UInt32
@@ -483,19 +510,20 @@ end
 Struct for dog species.
 """
 struct Dog <: Species
-    name::AbstractString
+    name::String
     nid::Int32
     chromosome::Vector{UInt32}
     M::UInt32
 end
 
 """
-    Dog(nid::Int)
+    Dog(nid::Integer; M::Integer = 100_000_000)
 This function creates a `Dog` object with the given `nid`. The chromosome
 lengths are from https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_011100685.1/
 """
-function Dog(nid::Int)
+function Dog(nid::Integer; M::Integer = 100_000_000)
     nid ≤ 0 && error("nid must be positive")
+    M > 0 || error("M must be positive")
     clng = [
         123_556_469,
         84_979_418,
@@ -538,7 +566,7 @@ function Dog(nid::Int)
         #124_992_030, #X
         # 16_728, #MT
     ]
-    return Dog("CanFam", nid, clng, 100_000_000)
+    return Dog("CanFam", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
 function Base.show(io::IO, c::Species)
@@ -553,3 +581,46 @@ function Base.show(io::IO, c::Species)
     length(c.chromosome) % 5 != 0 && println(io)
     print(io, lpad("bp/Morgan: ", 17), Float64(c.M))
 end
+
+"""
+    name(sp::Species)
+
+Return the species name.
+"""
+name(sp::Species) = sp.name
+
+"""
+    nid(sp::Species)
+
+Return the population size.
+"""
+nid(sp::Species) = Int(sp.nid)
+
+"""
+    chromosome(sp::Species)
+
+Return chromosome lengths in base pairs.
+"""
+chromosome(sp::Species) = sp.chromosome
+
+"""
+    total_bp(sp::Species)
+
+Return the total autosomal genome length in base pairs.
+"""
+total_bp(sp::Species) = sum(sp.chromosome)
+
+"""
+    cbp(sp::Species)
+
+Return cumulative chromosome endpoints in base pairs.
+"""
+cbp(sp::Species) = cumsum(sp.chromosome)
+
+"""
+    M(sp::Species)
+
+Return the number of base pairs per Morgan.
+"""
+M(sp::Species) = sp.M
+Base.length(sp::Species) = length(sp.chromosome)

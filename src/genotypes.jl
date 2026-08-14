@@ -1,9 +1,9 @@
 """
-    mutable struct Genotype
+    struct Genotype <: AbstractMatrix{Bool}
 A struct to store SNP genotypes in a BitMatrix, with individuals as rows and
-alleles as columns. The 
+alleles as columns.
 """
-mutable struct Genotype
+struct Genotype <: AbstractMatrix{Bool}
     nid::Int   # number of individuals
     nas::Int   # number of alleles
     gt::BitMatrix
@@ -43,7 +43,20 @@ function Genotype(gt::BitMatrix)
     return tg
 end
 
-function Base.show(io::IO, gt::Genotype)
-    println(io, "Genotype with $(gt.nid) individuals and $(gt.nas) alleles")
-    show(io, gt.gt[1:gt.nid, 1:gt.nas]) # show only the valid part
+function Base.show(io::IO, g::Genotype)
+    print(io, "Genotype with $(g.nid) individuals and $(g.nas) alleles")
+end
+
+# AbstractMatrix interface
+Base.size(g::Genotype) = (g.nid, g.nas)
+Base.IndexStyle(::Type{<:Genotype}) = IndexCartesian()
+
+@inline function Base.getindex(g::Genotype, i::Int, j::Int)
+    @boundscheck checkbounds(g, i, j)
+    @inbounds g.gt[i, j]
+end
+
+@inline function Base.setindex!(g::Genotype, v, i::Int, j::Int)
+    @boundscheck checkbounds(g, i, j)
+    @inbounds g.gt[i, j] = Bool(v)
 end

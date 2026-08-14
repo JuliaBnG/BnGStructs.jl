@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.4 (2026-08-14)
+
+- Added package documentation with a usage guide and API reference.
+- Made species and trait storage type-stable and added validated species accessors.
+- Added `AbstractMatrix` support and concise display output for haplotypes and genotypes.
+- Hardened threshold-trait input validation and preserved caller-provided weights.
+
 ## 0.2.2 (2026-02-13)
 
 - Bumped package version to 0.2.2

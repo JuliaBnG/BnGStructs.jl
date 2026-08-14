@@ -1,8 +1,8 @@
 """
-    mutable struct Haplotype
+    struct Haplotype <: AbstractMatrix{Bool}
 A struct to hold haplotype data in a compact BitMatrix form.
 """
-mutable struct Haplotype
+struct Haplotype <: AbstractMatrix{Bool}
     nlc::Int   # number of loci (rows logically = nlc, stored rows = 64 * cld(nlc, 64))
     nhp::Int   # number of haplotypes (columns in gt)
     gt::BitMatrix
@@ -40,4 +40,22 @@ function Haplotype(gt::BitMatrix)
     th = Haplotype(nlc, nhp)
     th.gt[1:nlc, 1:nhp] = gt # copy only the valid part
     return th
+end
+
+function Base.show(io::IO, h::Haplotype)
+    print(io, "Haplotype with $(h.nlc) loci and $(h.nhp) haplotypes")
+end
+
+# AbstractMatrix interface
+Base.size(h::Haplotype) = (h.nlc, h.nhp)
+Base.IndexStyle(::Type{<:Haplotype}) = IndexCartesian()
+
+@inline function Base.getindex(h::Haplotype, i::Int, j::Int)
+    @boundscheck checkbounds(h, i, j)
+    @inbounds h.gt[i, j]
+end
+
+@inline function Base.setindex!(h::Haplotype, v, i::Int, j::Int)
+    @boundscheck checkbounds(h, i, j)
+    @inbounds h.gt[i, j] = Bool(v)
 end

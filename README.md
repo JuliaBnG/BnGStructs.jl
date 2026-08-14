@@ -6,13 +6,15 @@ BnGStructs.jl is a Julia package providing efficient data structures for represe
 - `Haplotype` struct: compact storage of haplotype-major SNP data using `BitMatrix`
 - `Genotype` struct: compact storage of ID-major SNP data using `BitMatrix`
 - Conversion utilities between haplotype-major and ID-major representations
+- Built-in and generic species definitions with chromosome metadata
+- Continuous and threshold trait definitions, plus SNP-set metadata
 - Type-stable, memory-efficient, and compatible with multi-threaded operations
 
 ## Installation
 Until registered, install via path or Git URL:
 ```julia
 ] #to enter pkg environment
-add BnGStructs
+add https://github.com/JuliaBnG/BnGStructs.jl
 ```
 
 ## Usage Example
@@ -22,7 +24,7 @@ using BnGStructs
 # Create a Haplotype with 1000 loci and 200 haplotypes (must be even)
 hap = Haplotype(1000, 200)
 
-# Convert to Genotype (requires mtGEBV dependency)
+# Convert to Genotype
 gt = hap2id(hap)
 
 # Access underlying BitMatrix
@@ -30,6 +32,9 @@ gtmat = gt.gt
 
 # Define a Cattle population
 cattle = Cattle(1000)
+
+# Define a continuous trait
+milk_yield = Trait("MilkYield"; h²=0.3)
 ```
 
 ## Requirements for Registration
