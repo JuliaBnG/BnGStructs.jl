@@ -1,9 +1,17 @@
 """
     _mask_last_word_columns!(bm::BitMatrix, nrow::Int)
-Zero out the bits in the last 64-bit word of each column of the BitMatrix `bm`
-beyond the `nrow`-th row. This is useful when the number of logical rows is not a
-multiple of 64, and the BitMatrix has been allocated with extra rows to accommodate
-the storage in 64-bit words.
+
+Zero out bits beyond the `nrow`-th logical row in the final 64-bit word (`UInt64` chunk)
+of each column of `bm`.
+
+In Julia's `BitMatrix`, columns are stored as sequences of 64-bit words (`UInt64`).
+When the number of logical rows `nrow` is not an exact multiple of 64, extra bits in
+the final word of each column serve as storage padding. This in-place helper clears
+those excess padding bits to ensure consistent bitwise comparisons and hashing.
+
+# Arguments
+- `bm::BitMatrix`: The bit matrix whose terminal chunks will be masked.
+- `nrow::Int`: The number of logical rows.
 """
 function _mask_last_word_columns!(bm::BitMatrix, nrow::Int)
     m, n = size(bm)
@@ -23,17 +31,20 @@ function _mask_last_word_columns!(bm::BitMatrix, nrow::Int)
 end
 
 """
-    _transpose_gt!(dest_chunks, src_gt, outer_dim, inner_dim)
+    _transpose_gt!(dest_chunks::Vector{UInt64}, src_gt::BitMatrix, outer_dim::Int, inner_dim::Int)
 
-A private helper function to transpose genotype data between haplotype-major and
-individual-major layouts. It operates directly on the `chunks` of the underlying
-`BitMatrix` for performance.
+Transpose diploid genotype bits between locus-major (`Haplotype`) and individual-major (`Genotype`) layouts.
+
+This internal function writes directly into the preallocated 64-bit `UInt64` chunks of the destination
+`BitMatrix`. Multi-threading is parallelized across `outer_dim` (`Threads.@threads`) where each outer
+index corresponds to two adjacent columns in the destination matrix (representing the two homologous alleles
+or haplotypes per individual).
 
 # Arguments
-- `dest_chunks`: The `chunks` vector of the destination `BitMatrix`.
-- `src_gt`: The source `BitMatrix`.
-- `outer_dim`: The dimension to parallelize over (e.g., `nlc` or `nid`).
-- `inner_dim`: The other dimension.
+- `dest_chunks::Vector{UInt64}`: The chunk vector (`bm.chunks`) of the destination `BitMatrix`.
+- `src_gt::BitMatrix`: The source genotype/haplotype `BitMatrix`.
+- `outer_dim::Int`: The outer dimension size to parallelize over (`nlc` when transposing haplotype to genotype; `nid` when transposing genotype to haplotype).
+- `inner_dim::Int`: The inner dimension size (`nid` when transposing haplotype to genotype; `nlc` when transposing genotype to haplotype).
 """
 function _transpose_gt!(
     dest_chunks::Vector{UInt64},

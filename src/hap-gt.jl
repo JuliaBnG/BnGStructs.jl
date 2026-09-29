@@ -1,13 +1,35 @@
 """
-    hap2id(hps::Haplotype)
-This is to transform a `Haplotype` object to a `Genotype` object.
+    hap2id(hps::Haplotype) -> Genotype
 
-Given the SNP haplotypes `hps` of type `Haplotype`, this function transposes its
-`gt` field (of size `nlc × 2nid`) to a `BitMatrix` of size `n × 2nlc`, where `n`
-is the minimum number that is a multiple of 64 and is no less than `nid`. The
-resulting `BitMatrix` is used to construct and return a `Genotype` object.
+Convert a locus-major `Haplotype` matrix into an individual-major `Genotype` matrix.
 
-Note this function deems the computer is of 64-bit architecture.
+This operation transposes the underlying genetic bits:
+- Input `hps` has dimensions `(nlc, 2 * nid)`.
+- Output `Genotype` has dimensions `(nid, 2 * nlc)`.
+
+For each individual `i ∈ 1:nid` and locus `l ∈ 1:nlc`:
+- `hps[l, 2i - 1]` maps to `gt[i, 2l - 1]`.
+- `hps[l, 2i]` maps to `gt[i, 2l]`.
+
+The transposition operates directly on 64-bit word chunks in parallel using
+multi-threading (`Threads.@threads`).
+
+# Arguments
+- `hps::Haplotype`: Source haplotype matrix.
+
+# Returns
+- `Genotype`: Transposed genotype matrix.
+
+# Examples
+```julia
+using BnGStructs
+
+hps = Haplotype(500, 200) # 500 loci, 100 individuals
+gt = hap2id(hps)
+size(gt) # (100, 1000)
+```
+
+See also: [`id2hap`](@ref).
 """
 function hap2id(hps::Haplotype)
     nlc, nhp = hps.nlc, hps.nhp
@@ -23,16 +45,37 @@ function hap2id(hps::Haplotype)
 end
 
 """
-    id2hap(g::Genotype)
-This is to transform a `Genotype` object back to a `Haplotype` object,
-performing the reverse operation of `hap2id`.
+    id2hap(g::Genotype) -> Haplotype
 
-Given a `Genotype` object `g`, this function transposes its `gt` field (of size
-`nid × 2nlc`) to a `BitMatrix` of size `m × 2nid`, where `m` is the minimum
-number that is a multiple of 64 and is no less than `nlc`. The resulting
-`BitMatrix` is used to construct and return a `Haplotype` object.
+Convert an individual-major `Genotype` matrix back into a locus-major `Haplotype` matrix.
 
-Note this function deems the computer is of 64-bit architecture.
+Performs the inverse transformation of [`hap2id`](@ref):
+- Input `g` has dimensions `(nid, 2 * nlc)`.
+- Output `Haplotype` has dimensions `(nlc, 2 * nid)`.
+
+For each individual `i ∈ 1:nid` and locus `l ∈ 1:nlc`:
+- `g[i, 2l - 1]` maps to `hps[l, 2i - 1]`.
+- `g[i, 2l]` maps to `hps[l, 2i]`.
+
+The transposition operates directly on 64-bit word chunks in parallel using
+multi-threading (`Threads.@threads`).
+
+# Arguments
+- `g::Genotype`: Source genotype matrix.
+
+# Returns
+- `Haplotype`: Transposed haplotype matrix.
+
+# Examples
+```julia
+using BnGStructs
+
+gt = Genotype(100, 1_000) # 100 individuals, 500 loci
+hps = id2hap(gt)
+size(hps) # (500, 200)
+```
+
+See also: [`hap2id`](@ref).
 """
 function id2hap(g::Genotype)
     nid, nas = g.nid, g.nas

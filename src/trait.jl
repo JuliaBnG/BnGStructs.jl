@@ -1,22 +1,30 @@
 using Distributions
 
 """
-    AbstractTrait
-Abstract type for all traits.
+    abstract type AbstractTrait
+
+Abstract supertype for all genetic traits (quantitative and threshold/categorical).
+
+# Subtypes
+- [`Trait`](@ref): Abstract supertype for continuous traits with a population mean `μ` (e.g. [`aTrait`](@ref)).
+- [`tTrait`](@ref): Concrete type for threshold/ordinal traits modeled via liability thresholds.
+- Planned trait architectures: [`adTrait`](@ref), [`adiTrait`](@ref), [`dtTrait`](@ref), [`ditTrait`](@ref).
 """
 abstract type AbstractTrait end
 
 """
-    abstract type Trait <: AbstractTrait end # non-threshold traits
-Non-threshold traits have a field μ. 
+    abstract type Trait <: AbstractTrait
+
+Abstract supertype for continuous (non-threshold) quantitative traits.
+
+Subtypes of `Trait` possess a population phenotypic mean field `μ`.
 """
 abstract type Trait <: AbstractTrait end # non-threshold traits
 
 """
     struct adTrait <: Trait
-        name::AbstractString
-    end
-Trait with additive and dominance effects. To be implemented later.
+
+Planned trait type with additive and dominance genetic effects.
 """
 struct adTrait <: Trait
     name::String
@@ -24,9 +32,8 @@ end
 
 """
     struct adiTrait <: Trait
-        name::String
-    end
-Trait with additive, dominance, and epistatic effects. To be implemented later.
+
+Planned trait type with additive, dominance, and epistatic interaction effects.
 """
 struct adiTrait <: Trait
     name::String
@@ -34,9 +41,8 @@ end
 
 """
     struct dtTrait <: AbstractTrait
-        name::String
-    end
-Threshold trait with dominance effects. To be implemented later.
+
+Planned threshold trait type with dominance genetic effects.
 """
 struct dtTrait <: AbstractTrait
     name::String
@@ -44,9 +50,8 @@ end
 
 """
     struct ditTrait <: AbstractTrait
-        name::String
-    end
-Threshold trait with dominance, and epistatic effects. To be implemented later.
+
+Planned threshold trait type with dominance and epistatic interaction effects.
 """
 struct ditTrait <: AbstractTrait
     name::String
@@ -54,17 +59,20 @@ end
 
 """
     struct aTrait{D<:Distribution} <: Trait
-        name::String # must be a valid Julia identifier
-        sex::Int     # expressed in ♀(0), or ♂(1), or 2 for both sexes.
-        age::Float64 # age that trait is measured
-        h²::Float64  # narrow-sense heritability
-        QTL::Symbol  # QTL column name in lmp
-        μ::Float64   # population mean
-        σₐ::Float64  # TBV std
-        da::D        # QTL additive effect distribution, e.g., Normal()
-    end
 
-Pure additive trait.
+A continuous quantitative trait with purely additive genetic architecture.
+
+# Fields
+- `name::String`: Trait name (must be a valid Julia identifier).
+- `sex::Int`: Sex-limited expression: `0` for females (♀), `1` for males (♂), or `2` for both sexes.
+- `age::Float64`: Measurement age or developmental stage (non-negative).
+- `h²::Float64`: Narrow-sense heritability (`0 < h² ≤ 1`).
+- `QTL::Symbol`: Column name identifying corresponding QTL loci in a locus map.
+- `μ::Float64`: Population phenotypic mean.
+- `σₐ::Float64`: Additive genetic standard deviation (standard deviation of true breeding values, `σₐ > 0`).
+- `da::D`: Probability distribution used to sample QTL additive effect sizes (e.g., `Distributions.Normal()`).
+
+See also: [`Trait`](@ref), [`tTrait`](@ref).
 """
 struct aTrait{D<:Distribution} <: Trait
     name::String # must be a valid Julia identifier
@@ -79,19 +87,24 @@ end
 
 """
     struct tTrait{D<:Distribution} <: AbstractTrait
-        name::String # must be a valid Julia identifier
-        threshold::Vector{Float64} # phenotype will be 0, 1, ...
-        sex::Int     # expressed in ♀(0), or ♂(1), 2 for both sexes.
-        age::Float64 # age that trait is measured
-        h²::Float64  # narrow-sense heritability
-        QTL::Symbol
-        σₐ::Float64  # TBV std
-        da::D        # e.g., Normal()
-    end
-Struct for threshold traits. The number of phenotype categories equals the
-length of threshold + 1. The underlying genotype is continuous. The phenotype
-will be one of 0, 1, ..., `length(threshold)`. Population mean is not used for
-threshold traits.
+
+A categorical or ordinal threshold trait modeled under the polygenic liability-threshold framework.
+
+In threshold traits, the underlying liability follows a continuous additive distribution with standard deviation
+`σₐ = 1.0`. Phenotypic categories (`0, 1, ..., K`) are demarcated by `K` real-valued thresholds,
+where `K = length(threshold)`.
+
+# Fields
+- `name::String`: Trait name (must be a valid Julia identifier).
+- `threshold::Vector{Float64}`: Sorted boundary cutoffs on the phenotypic liability scale.
+- `sex::Int`: Sex-limited expression: `0` for females (♀), `1` for males (♂), or `2` for both sexes.
+- `age::Float64`: Measurement age or developmental stage (non-negative).
+- `h²::Float64`: Narrow-sense heritability on the liability scale (`0 < h² ≤ 1`).
+- `QTL::Symbol`: Column name identifying corresponding QTL loci in a locus map.
+- `σₐ::Float64`: Additive genetic standard deviation on the liability scale (fixed at `1.0`).
+- `da::D`: Probability distribution used to sample QTL additive effect sizes on the liability scale.
+
+See also: [`Trait`](@ref), [`aTrait`](@ref).
 """
 struct tTrait{D<:Distribution} <: AbstractTrait
     name::String # must be a valid Julia identifier
@@ -106,18 +119,39 @@ end
 
 """
     Trait(
-        name;
+        name::AbstractString;
         sex = 2,
-        age = 0.,
+        age = 0.0,
         h² = 0.25,
         QTL = :qtl,
         μ = 0.0,
         σₐ = 1.0,
         da = Normal(),
-    )
-Helper function to create a Trait object. It checks the validity of the input
-parameters and returns a Trait object. Refer to the `Trait` struct for the
-description of the parameters.
+    ) -> aTrait
+
+Construct a continuous additive quantitative trait ([`aTrait`](@ref)).
+
+# Arguments
+- `name::AbstractString`: Name of the trait. Must be a valid Julia identifier suitable for DataFrame column names.
+
+# Keywords
+- `sex`: Sex-limited expression: `0` for females (♀), `1` for males (♂), `2` for both (default: `2`).
+- `age`: Measurement age or stage (default: `0.0`, must be finite and `>= 0`).
+- `h²`: Narrow-sense heritability (default: `0.25`, must be in `(0, 1]`).
+- `QTL`: Symbol naming the QTL marker column in locus maps (default: `:qtl`).
+- `μ`: Population phenotypic mean (default: `0.0`, must be finite).
+- `σₐ`: Additive genetic standard deviation (default: `1.0`, must be finite and `> 0`).
+- `da`: Distribution of QTL additive effects (default: `Normal()`).
+
+# Returns
+- `aTrait`: Validated continuous trait definition.
+
+# Examples
+```julia
+using BnGStructs, Distributions
+
+milk = Trait("MilkYield"; h²=0.35, μ=30.0, σₐ=2.5, da=Normal(0, 1.2))
+```
 """
 function Trait(
     name::AbstractString;
@@ -147,19 +181,42 @@ end
         age = 1.0,
         h² = 0.25,
         QTL = :qtl,
-        σₐ = 1.0,
         da = Normal(),
-    )
-Helper function to create a threshold `tTrait`. It checks the validity of the
-input parameters and returns a `tTrait`. Refer to the `tTrait` struct for the
-description of the parameters. The weight, of minimum length 2, defines the
-relative ratio of the phenotype categories. The length of the weight is one more
-than the length of the thresholds in struct `tTrait`. This function then decides
-the thresholds based on the weight and standard normal distribution of the
-genotype. 
+    ) -> tTrait
 
-The underlying TBV distribution is Normal(0, 1.0). The categorical phenotypes
-are calculated from the phenotypic thresholds calculated from `Weights`.
+Construct a threshold trait ([`tTrait`](@ref)) under the liability-threshold model.
+
+The relative frequencies or proportions of the categorical phenotypic outcomes are specified
+by `weight`. For `K + 1` phenotype categories (`0, 1, ..., K`), `weight` must contain at least 2
+positive values. Phenotypic thresholds are computed via quantiles of `Normal(0, σₚ)`
+where phenotypic standard deviation `σₚ = sqrt(1 / h²)`.
+
+# Arguments
+- `name::AbstractString`: Name of the trait (must be a valid Julia identifier).
+- `weight::AbstractVector{<:Real}`: Relative proportions or weights for each category (length `>= 2`).
+
+# Keywords
+- `sex`: Sex-limited expression: `0` for females (♀), `1` for males (♂), `2` for both (default: `2`).
+- `age`: Measurement age or stage (default: `1.0`, must be finite and `>= 0`).
+- `h²`: Narrow-sense heritability on the liability scale (default: `0.25`, must be in `(0, 1]`).
+- `QTL`: Symbol naming the QTL marker column in locus maps (default: `:qtl`).
+- `da`: Distribution of QTL additive effects on the liability scale (default: `Normal()`).
+
+# Returns
+- `tTrait`: Validated threshold trait definition with computed thresholds.
+
+# Examples
+```julia
+using BnGStructs
+
+# Binary disease trait: 90% unaffected (0), 10% affected (1)
+disease = Trait("Mastitis", [0.9, 0.1]; h²=0.10)
+length(disease.threshold) # 1
+
+# Three categories: low (50%), medium (30%), high (20%)
+calving_ease = Trait("CalvingEase", [0.5, 0.3, 0.2]; h²=0.20)
+length(calving_ease.threshold) # 2
+```
 """
 function Trait(
     name::AbstractString,

@@ -1,6 +1,43 @@
 """
     struct Haplotype <: AbstractMatrix{Bool}
-A struct to hold haplotype data in a compact BitMatrix form.
+
+A compact, bit-packed matrix representation of phased haplotype data across genetic loci.
+
+`Haplotype` organizes genetic data in a locus-major layout:
+- Rows represent genetic loci (`1:nlc`).
+- Columns represent phased haplotypes (`1:nhp`).
+- For diploid individuals, each individual occupies two consecutive columns:
+  individual `i` corresponds to haplotypes at column indices `2i - 1` and `2i`.
+
+`Haplotype` implements the `AbstractMatrix{Bool}` interface (`size`, scalar indexing `h[locus, haplotype]`,
+and assignment). Internally, data are stored in a `BitMatrix` whose row count is rounded up to a multiple
+of 64 (`64 * cld(nlc, 64)`) to enable fast 64-bit word-level operations. Storage padding rows beyond
+`nlc` are zero-masked and hidden from standard indexing.
+
+# Fields
+- `nlc::Int`: Number of genetic loci (logical rows; must be positive).
+- `nhp::Int`: Number of haplotypes (columns; must be positive and even).
+- `gt::BitMatrix`: Internal bit matrix of dimensions `(64 * cld(nlc, 64), nhp)`.
+
+# Constructors
+- `Haplotype(nlc::Int, nhp::Int, gt::BitMatrix)`: Low-level constructor wrapping an existing `BitMatrix`
+  with matching dimensions; zero-masks padding bits beyond `nlc`.
+- `Haplotype(nlc::Int, nhp::Int)`: Allocate an empty (all-false) `Haplotype` matrix.
+- `Haplotype(gt::BitMatrix)`: Create a `Haplotype` by inferring `nlc = size(gt, 1)` and `nhp = size(gt, 2)`
+  and copying the data into padded storage.
+
+# Examples
+```julia
+using BnGStructs
+
+# Create a haplotype matrix for 1,000 loci across 50 diploid individuals (100 haplotypes)
+hps = Haplotype(1_000, 100)
+size(hps) # (1000, 100)
+
+# Set allele for locus 10 on the first haplotype of individual 1
+hps[10, 1] = true
+hps[10, 1] # true
+```
 """
 struct Haplotype <: AbstractMatrix{Bool}
     nlc::Int   # number of loci (rows logically = nlc, stored rows = 64 * cld(nlc, 64))
@@ -18,9 +55,16 @@ struct Haplotype <: AbstractMatrix{Bool}
 end
 
 """
-    Haplotype(nlc::Int, nhp::Int)
-Create a Haplotype struct with `nlc` loci and `nhp` haplotypes. The
-corresponding BitMatrix is initialized to all zeros.
+    Haplotype(nlc::Int, nhp::Int) -> Haplotype
+
+Construct an all-zero (`false`) `Haplotype` object with `nlc` loci and `nhp` haplotypes.
+
+# Arguments
+- `nlc::Int`: Number of loci (must be positive).
+- `nhp::Int`: Number of haplotypes (must be positive and even).
+
+# Returns
+- `Haplotype`: An initialized haplotype matrix backed by a zero-filled, 64-bit-aligned `BitMatrix`.
 """
 function Haplotype(nlc::Int, nhp::Int)
     nlc > 0 || error("nlc must be positive")
@@ -30,10 +74,19 @@ function Haplotype(nlc::Int, nhp::Int)
 end
 
 """
-    Haplotype(gt::BitMatrix)
-Create a Haplotype struct from a BitMatrix `gt`. The number of loci and
-haplotypes are inferred from the size of `gt`. Only the valid part of `gt`
-(defined by `nlc` and `nhp`) is copied.
+    Haplotype(gt::BitMatrix) -> Haplotype
+
+Construct a `Haplotype` from an existing `BitMatrix` `gt`.
+
+The number of loci (`nlc`) and haplotypes (`nhp`) are inferred from `size(gt, 1)` and `size(gt, 2)`.
+`nhp` must be positive and even. Only the valid rows (`1:nlc`) are copied into the internal 64-bit
+chunk-aligned storage.
+
+# Arguments
+- `gt::BitMatrix`: Source bit matrix with dimensions `(nlc, nhp)`.
+
+# Returns
+- `Haplotype`: A new `Haplotype` instance containing the copied bits.
 """
 function Haplotype(gt::BitMatrix)
     nlc, nhp = size(gt)
