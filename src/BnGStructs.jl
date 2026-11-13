@@ -14,11 +14,18 @@ include("locusset.jl")
 # Genomic variant map and QTL architectures
 include("variantmap.jl")
 include("qtl.jl")
+# Subsetting, dosages and the packed file format
+include("subset.jl")
+include("io.jl")
 
 export Haplotype, Genotype, hap2id, id2hap, Species
 export Cat, Cattle, Chicken, Dog, GenericSpecies, Goat, Horse, Pig, Rabbit, Sheep
 export AbstractTrait, Trait, aTrait, tTrait, SNPSet
 export VariantMap, LocusSet, TraitQTL, MultiTraitQTL, tbv
-export name, nid, chromosome, M, total_bp, cbp
+export genotypic_value, breeding_value, trait_columns
+export chrpos, check_coordinates
+export packed, select_individuals, select_loci, dosage
+export write_haplotypes, read_haplotypes
+export nid, chromosome, total_bp, cbp, map_length
 
 end # module BnGStructs
