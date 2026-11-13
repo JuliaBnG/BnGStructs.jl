@@ -1,128 +1,128 @@
-# Contents
-# Species
-# Cattle
-# Chicken
-# Pig
-# Sheep
 """
-    abstract type Species
+    struct Species
 
-Abstract supertype representing species metadata for genetic and genomic simulations.
-
-A `Species` encapsulates species-level genomic parameters including:
-- Species name / identifier: [`name`](@ref)
-- Reference or population size: [`nid`](@ref)
-- Autosomal chromosome lengths in base pairs: [`chromosome`](@ref), [`total_bp`](@ref), [`cbp`](@ref)
-- Number of chromosomes: `length(sp)`
-- Recombination rate scaling in base pairs per Morgan: [`M`](@ref)
-
-# Subtypes
-- [`GenericSpecies`](@ref): Custom species defined by user-supplied chromosome lengths.
-- Built-in domestic species with curated autosomal chromosome lengths:
-  [`Cattle`](@ref), [`Sheep`](@ref), [`Chicken`](@ref), [`Pig`](@ref),
-  [`Goat`](@ref), [`Horse`](@ref), [`Rabbit`](@ref), [`Cat`](@ref), [`Dog`](@ref).
-"""
-abstract type Species end
-
-"""
-    struct GenericSpecies <: Species
-
-User-defined species representation with arbitrary chromosome lengths.
+The genome of a species as the simulation sees it: chromosome lengths and
+their genetic lengths. One concrete type serves every species; `Cattle`,
+`Sheep`, `Chicken`, `Pig`, `Goat`, `Horse`, `Rabbit`, `Cat` and `Dog` are
+constructors with curated autosomal lengths, and [`GenericSpecies`](@ref)
+builds a custom genome.
 
 # Fields
-- `name::String`: Species identifier.
-- `nid::Int32`: Population size (must be positive).
-- `chromosome::Vector{UInt32}`: Vector of chromosome lengths in base pairs (bp).
-- `M::UInt32`: Base pairs per Morgan (default `100_000_000`, corresponding to 1 cM/Mb).
+- `name::String`: Species or assembly code, e.g. `"BosTau"`.
+- `nid::Int32`: Population size, or `0` if not set. **Deprecated**: a
+  population size is a property of a population, not of a species. The
+  field stays in 0.3 because FisherWright and BnGsim read it, and is to be
+  removed once they take the size as their own argument. Prefer the
+  constructors without a size.
+- `chromosome::Vector{UInt32}`: Chromosome lengths in base pairs (autosomes
+  only; sex chromosomes and the mitochondrion are not modelled).
+- `M::UInt32`: Base pairs per Morgan, the genome-wide default
+  recombination scale (`100_000_000` is 1 cM/Mb).
+- `ends::Vector{UInt32}`: Cumulative chromosome ends, the genome-wide
+  coordinate of the last base of each chromosome ([`cbp`](@ref)).
+- `morgan::Vector{Float64}`: Genetic length of each chromosome in Morgans.
+  Defaults to `chromosome ./ M`; give it to model chromosomes whose
+  recombination rate per base differs (microchromosomes, or a minimum of
+  about 0.5 M per chromosome from the obligate crossover).
 
-# Constructors
-    GenericSpecies(name::AbstractString, nid::Integer, chromosome::AbstractVector{<:Integer}; M::Integer=100_000_000) -> GenericSpecies
+The total genome must fit the `UInt32` genome-wide coordinate
+(< 4 294 967 296 bp); the constructor checks this.
+
+# Constructor
+    Species(name, nid, chromosome; M = 100_000_000, morgan = nothing)
+
+`nid` is a positive integer or `nothing`.
+
+See also [`map_length`](@ref), [`total_bp`](@ref), [`cbp`](@ref).
+"""
+struct Species
+    name::String
+    nid::Int32
+    chromosome::Vector{UInt32}
+    M::UInt32
+    ends::Vector{UInt32}
+    morgan::Vector{Float64}
+
+    function Species(
+        name::AbstractString,
+        nid::Union{Nothing,Integer},
+        chromosome::AbstractVector{<:Integer};
+        M::Integer = 100_000_000,
+        morgan::Union{Nothing,AbstractVector{<:Real}} = nothing,
+    )
+        nid === nothing || nid > 0 || throw(ArgumentError("nid must be positive"))
+        nid === nothing || nid <= typemax(Int32) ||
+            throw(ArgumentError("nid must not exceed $(typemax(Int32))"))
+        isempty(chromosome) && throw(ArgumentError("at least one chromosome length is required"))
+        all(>(0), chromosome) || throw(ArgumentError("chromosome lengths must be positive"))
+        0 < M <= typemax(UInt32) || throw(ArgumentError("M must be positive and fit UInt32"))
+        sum(UInt64, chromosome) <= typemax(UInt32) || throw(ArgumentError(
+            "the genome of $name exceeds $(typemax(UInt32)) bp, the range of the UInt32 coordinate"))
+        len = convert(Vector{UInt32}, chromosome)
+        gl = if morgan === nothing
+            Float64.(len) ./ Float64(M)
+        else
+            length(morgan) == length(len) ||
+                throw(ArgumentError("morgan needs one genetic length per chromosome ($(length(len)))"))
+            all(m -> isfinite(m) && m > 0, morgan) ||
+                throw(ArgumentError("genetic lengths must be finite and positive"))
+            convert(Vector{Float64}, morgan)
+        end
+        new(String(name), Int32(something(nid, 0)), len, UInt32(M), cumsum(len), gl)
+    end
+end
+
+"""
+    GenericSpecies(name, nid, chromosome; M = 100_000_000, morgan = nothing) -> Species
+    GenericSpecies(name, chromosome; M = 100_000_000, morgan = nothing) -> Species
+    GenericSpecies(name, nid, chromosome, M) -> Species
+
+A [`Species`](@ref) with user-supplied chromosome lengths (bp). The second
+form leaves the population size unset; the third is the positional form
+that `GenericSpecies` had as a struct before 0.3.
 
 # Examples
 ```julia
 using BnGStructs
 
-sp = GenericSpecies("ModelOrganism", 1000, [15_000_000, 25_000_000]; M=100_000_000)
-name(sp)       # "ModelOrganism"
-total_bp(sp)   # 40000000
-length(sp)     # 2
+sp = GenericSpecies("ModelOrganism", [15_000_000, 25_000_000])
+total_bp(sp)     # 40000000
+length(sp)       # 2
+map_length(sp)   # [0.15, 0.25]
+
+# two chromosomes of very different size, each with 0.5 M
+micro = GenericSpecies("Micro", [50_000_000, 5_000_000]; morgan = [0.5, 0.5])
 ```
 """
-struct GenericSpecies <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32} # Changed to UInt32
-    M::UInt32 # Changed to UInt32
-end
+GenericSpecies(name::AbstractString, nid::Integer, chromosome::AbstractVector{<:Integer}; kw...) =
+    Species(name, nid, chromosome; kw...)
+GenericSpecies(name::AbstractString, chromosome::AbstractVector{<:Integer}; kw...) =
+    Species(name, nothing, chromosome; kw...)
+# The positional form of the struct constructor that `GenericSpecies` had as a
+# type before 0.3; FisherWright's examples and tests use it.
+GenericSpecies(name::AbstractString, nid::Integer, chromosome::AbstractVector{<:Integer}, M::Integer) =
+    Species(name, nid, chromosome; M = M)
 
 """
-    GenericSpecies(name::AbstractString, nid::Integer, chromosome::AbstractVector{<:Integer}; M::Integer=100_000_000) -> GenericSpecies
+    Cattle([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Construct a custom `GenericSpecies` with a given `name`, population size `nid`,
-chromosome lengths `chromosome` (in bp), and base pairs per Morgan `M`.
-
-# Arguments
-- `name::AbstractString`: Name or label for the species.
-- `nid::Integer`: Population size (must be positive).
-- `chromosome::AbstractVector{<:Integer}`: Vector of positive chromosome lengths in base pairs.
-
-# Keywords
-- `M::Integer`: Base pairs per Morgan (default: `100_000_000`).
-
-# Returns
-- `GenericSpecies`: Initialized species object.
-"""
-function GenericSpecies(
-    name::AbstractString,
-    nid::Integer,
-    chromosome::AbstractVector{<:Integer};
-    M::Integer=100_000_000,
-)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    isempty(chromosome) && throw(ArgumentError("at least one chromosome length is required"))
-    all(chromosome .> 0) || throw(ArgumentError("chromosome lengths must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
-    return GenericSpecies(String(name), Int32(nid), UInt32.(chromosome), UInt32(M))
-end
-
-"""
-    struct Cattle <: Species
-
-Species definition for domestic cattle (*Bos taurus*).
-
-# Fields
-- `name::String`: Species identifier (`"BosTau"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (29 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Cattle <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32} # Changed to UInt32
-    M::UInt32 # Changed to UInt32
-end
-
-"""
-    Cattle(nid::Integer; M::Integer = 100_000_000) -> Cattle
-
-Create a `Cattle` (*Bos taurus*) species object with population size `nid`.
+Create the `Species` of Cattle (*Bos taurus*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (29 autosomes) are sourced from NCBI assembly
 [GCF_000003055.6](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000003055.6/) (ARS-UCD1.2).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Cattle`: Initialized cattle species instance.
+- `Species`: The cattle genome.
 """
-function Cattle(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Cattle(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         158_534_110,
         136_231_102,
@@ -155,47 +155,29 @@ function Cattle(nid::Integer; M::Integer = 100_000_000)
         51_098_607,
         # 148_823_899, #X
     ]
-    Cattle("BosTau", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("BosTau", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Sheep <: Species
+    Sheep([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic sheep (*Ovis aries*).
-
-# Fields
-- `name::String`: Species identifier (`"OviAri"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (26 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Sheep <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32} # Changed to UInt32
-    M::UInt32 # Changed to UInt32
-end
-
-"""
-    Sheep(nid::Integer; M::Integer = 100_000_000) -> Sheep
-
-Create a `Sheep` (*Ovis aries*) species object with population size `nid`.
+Create the `Species` of Sheep (*Ovis aries*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (26 autosomes) are sourced from NCBI assembly
 [GCF_000298735.2](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000298735.2/) (Oar_v4.0).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Sheep`: Initialized sheep species instance.
+- `Species`: The sheep genome.
 """
-function Sheep(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Sheep(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         275_406_953,
         248_966_461,
@@ -225,47 +207,29 @@ function Sheep(nid::Integer; M::Integer = 100_000_000)
         44_047_080,
         # 135_185_801, #X
     ]
-    return Sheep("OviAri", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("OviAri", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Chicken <: Species
+    Chicken([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic chicken (*Gallus gallus*).
-
-# Fields
-- `name::String`: Species identifier (`"GalGal"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (39 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Chicken <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32} # Changed to UInt32
-    M::UInt32 # Changed to UInt32
-end
-
-"""
-    Chicken(nid::Integer; M::Integer = 100_000_000) -> Chicken
-
-Create a `Chicken` (*Gallus gallus*) species object with population size `nid`.
+Create the `Species` of Chicken (*Gallus gallus*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (39 autosomes) are sourced from NCBI assembly
 [GCF_016699485.2](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_016699485.2/) (bGalGal1.mat.broiler.GRCg7b).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Chicken`: Initialized chicken species instance.
+- `Species`: The chicken genome.
 """
-function Chicken(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Chicken(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         196_449_156,
         149_539_284,
@@ -310,47 +274,29 @@ function Chicken(nid::Integer; M::Integer = 100_000_000)
         # 86_044_486, #Z
         # 16_784, #MT
     ]
-    return Chicken("GalGal", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("GalGal", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Pig <: Species
+    Pig([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic pig (*Sus scrofa*).
-
-# Fields
-- `name::String`: Species identifier (`"SusScr"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (18 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Pig <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32} # Changed to UInt32
-    M::UInt32 # Changed to UInt32
-end
-
-"""
-    Pig(nid::Integer; M::Integer = 100_000_000) -> Pig
-
-Create a `Pig` (*Sus scrofa*) species object with population size `nid`.
+Create the `Species` of Pig (*Sus scrofa*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (18 autosomes) are sourced from NCBI assembly
 [GCF_000003025.6](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000003025.6/) (Sscrofa11.1).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Pig`: Initialized pig species instance.
+- `Species`: The pig genome.
 """
-function Pig(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Pig(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         274_330_532,
         151_935_994,
@@ -373,47 +319,29 @@ function Pig(nid::Integer; M::Integer = 100_000_000)
         #125_939_595, #X
         #43_547_828,  #Y
     ]
-    return Pig("SusScr", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("SusScr", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Goat <: Species
+    Goat([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic goat (*Capra hircus*).
-
-# Fields
-- `name::String`: Species identifier (`"CapHir"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (29 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Goat <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32}
-    M::UInt32
-end
-
-"""
-    Goat(nid::Integer; M::Integer = 100_000_000) -> Goat
-
-Create a `Goat` (*Capra hircus*) species object with population size `nid`.
+Create the `Species` of Goat (*Capra hircus*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (29 autosomes) are sourced from NCBI assembly
 [GCF_001704415.2](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_001704415.2/) (ARS1).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Goat`: Initialized goat species instance.
+- `Species`: The goat genome.
 """
-function Goat(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Goat(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         157_403_528,
         136_510_947,
@@ -445,47 +373,29 @@ function Goat(nid::Integer; M::Integer = 100_000_000)
         44_672_302,
         51_332_696,
     ]
-    return Goat("CapHir", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("CapHir", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Horse <: Species
+    Horse([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic horse (*Equus caballus*).
-
-# Fields
-- `name::String`: Species identifier (`"EquCab"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (31 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Horse <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32}
-    M::UInt32
-end
-
-"""
-    Horse(nid::Integer; M::Integer = 100_000_000) -> Horse
-
-Create a `Horse` (*Equus caballus*) species object with population size `nid`.
+Create the `Species` of Horse (*Equus caballus*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (31 autosomes) are sourced from NCBI assembly
 [GCF_002863925.1](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_002863925.1/) (EquCab3.0).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Horse`: Initialized horse species instance.
+- `Species`: The horse genome.
 """
-function Horse(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Horse(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         188_260_577,
         121_350_024,
@@ -520,47 +430,29 @@ function Horse(nid::Integer; M::Integer = 100_000_000)
         26_001_039,
         #128_206_784,
     ]
-    return Horse("EquCab", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("EquCab", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Rabbit <: Species
+    Rabbit([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for European rabbit (*Oryctolagus cuniculus*).
-
-# Fields
-- `name::String`: Species identifier (`"OryCun"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (21 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Rabbit <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32}
-    M::UInt32
-end
-
-"""
-    Rabbit(nid::Integer; M::Integer = 100_000_000) -> Rabbit
-
-Create a `Rabbit` (*Oryctolagus cuniculus*) species object with population size `nid`.
+Create the `Species` of Rabbit (*Oryctolagus cuniculus*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (21 autosomes) are sourced from NCBI assembly
 [GCF_000003625.3](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000003625.3/) (OryCun2.0).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Rabbit`: Initialized rabbit species instance.
+- `Species`: The rabbit genome.
 """
-function Rabbit(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Rabbit(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         194_850_757,
         174_332_312,
@@ -585,47 +477,29 @@ function Rabbit(nid::Integer; M::Integer = 100_000_000)
         15_578_276,
         #111_700_775,
     ]
-    return Rabbit("OryCun", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("OryCun", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Cat <: Species
+    Cat([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic cat (*Felis catus*).
-
-# Fields
-- `name::String`: Species identifier (`"FelCat"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (18 autosomes: A1-3, B1-4, C1-2, D1-4, E1-3, F1-2) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Cat <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32}
-    M::UInt32
-end
-
-"""
-    Cat(nid::Integer; M::Integer = 100_000_000) -> Cat
-
-Create a `Cat` (*Felis catus*) species object with population size `nid`.
+Create the `Species` of Cat (*Felis catus*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (18 autosomes) are sourced from NCBI assembly
 [GCF_018350175.1](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_018350175.1/) (F.catus_Fca126_mat1.0).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Cat`: Initialized cat species instance.
+- `Species`: The cat genome.
 """
-function Cat(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Cat(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         239_360_788,
         169_471_080,
@@ -647,47 +521,29 @@ function Cat(nid::Integer; M::Integer = 100_000_000)
         52_190_560, # F1-2
         #127_149_045, #X
     ]
-    return Cat("FelCat", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("FelCat", nid, clng; M = M, morgan = morgan)
 end
 
 """
-    struct Dog <: Species
+    Dog([nid]; M = 100_000_000, morgan = nothing) -> Species
 
-Species definition for domestic dog (*Canis lupus familiaris*).
-
-# Fields
-- `name::String`: Species identifier (`"CanFam"`).
-- `nid::Int32`: Population size.
-- `chromosome::Vector{UInt32}`: Autosomal chromosome lengths (38 autosomes) in base pairs.
-- `M::UInt32`: Base pairs per Morgan.
-"""
-struct Dog <: Species
-    name::String
-    nid::Int32
-    chromosome::Vector{UInt32}
-    M::UInt32
-end
-
-"""
-    Dog(nid::Integer; M::Integer = 100_000_000) -> Dog
-
-Create a `Dog` (*Canis lupus familiaris*) species object with population size `nid`.
+Create the `Species` of Dog (*Canis lupus familiaris*) genome. `nid`, a population size, is optional and deprecated
+(see [`Species`](@ref)).
 
 Autosomal chromosome lengths (38 autosomes) are sourced from NCBI assembly
 [GCF_011100685.1](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_011100685.1/) (UU_Cfam_GSD_1.0).
 
 # Arguments
-- `nid::Integer`: Population size (must be positive).
+- `nid::Integer`: Population size (optional; must be positive if given).
 
 # Keywords
 - `M::Integer`: Base pairs per Morgan (default: `100_000_000`, corresponding to 1 cM/Mb).
+- `morgan`: Genetic length of each chromosome in Morgans (default: `chromosome ./ M`).
 
 # Returns
-- `Dog`: Initialized dog species instance.
+- `Species`: The dog genome.
 """
-function Dog(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
-    M > 0 || throw(ArgumentError("M must be positive"))
+function Dog(nid::Union{Nothing,Integer} = nothing; M::Integer = 100_000_000, morgan = nothing)
     clng = [
         123_556_469,
         84_979_418,
@@ -730,12 +586,12 @@ function Dog(nid::Integer; M::Integer = 100_000_000)
         #124_992_030, #X
         # 16_728, #MT
     ]
-    return Dog("CanFam", Int32(nid), UInt32.(clng), UInt32(M))
+    return Species("CanFam", nid, clng; M = M, morgan = morgan)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", c::Species)
     println(io, lpad("Name: ", 17), c.name)
-    println(io, lpad("Population size: ", 17), c.nid)
+    println(io, lpad("Population size: ", 17), c.nid > 0 ? c.nid : "not set")
     println(io, lpad("Chromosome bp: ", 17))
     for (i, c) in enumerate(c.chromosome)
         i % 5 == 1 && print(io, ' '^15)
@@ -743,13 +599,15 @@ function Base.show(io::IO, ::MIME"text/plain", c::Species)
         i % 5 == 0 && println(io)
     end
     length(c.chromosome) % 5 != 0 && println(io)
-    print(io, lpad("bp/Morgan: ", 17), Float64(c.M))
+    println(io, lpad("bp/Morgan: ", 17), Float64(c.M))
+    print(io, lpad("Map length: ", 17), round(sum(c.morgan); digits = 3), " M")
 end
 
 """
     name(sp::Species) -> String
 
-Return the species name or code (e.g., `"BosTau"`, `"CanFam"`).
+Return the species name or code (e.g., `"BosTau"`, `"CanFam"`). Not exported
+(the name is too generic); call it as `BnGStructs.name(sp)` or read `sp.name`.
 
 # Arguments
 - `sp::Species`: Target species instance.
@@ -762,7 +620,7 @@ Return the species name or code (e.g., `"BosTau"`, `"CanFam"`).
 using BnGStructs
 
 sp = Cattle(100)
-name(sp) # "BosTau"
+BnGStructs.name(sp) # "BosTau"; the same as sp.name
 ```
 """
 name(sp::Species) = sp.name
@@ -770,7 +628,8 @@ name(sp::Species) = sp.name
 """
     nid(sp::Species) -> Int
 
-Return the species population size.
+Return the population size stored in the species, or throw if none is set.
+Deprecated together with the `nid` field; see [`Species`](@ref).
 
 # Arguments
 - `sp::Species`: Target species instance.
@@ -786,7 +645,10 @@ sp = Cattle(100)
 nid(sp) # 100
 ```
 """
-nid(sp::Species) = Int(sp.nid)
+function nid(sp::Species)
+    sp.nid > 0 || throw(ArgumentError("no population size is set for $(sp.name)"))
+    return Int(sp.nid)
+end
 
 """
     chromosome(sp::Species) -> Vector{UInt32}
@@ -828,7 +690,7 @@ sp = Cattle(100)
 total_bp(sp) # sum of all 29 autosome lengths
 ```
 """
-total_bp(sp::Species) = sum(sp.chromosome)
+total_bp(sp::Species) = Int(sp.ends[end])
 
 """
     cbp(sp::Species) -> Vector{UInt32}
@@ -851,16 +713,13 @@ sp = GenericSpecies("Toy", 10, [1_000, 2_000, 3_000])
 cbp(sp) # UInt32[1000, 3000, 6000]
 ```
 """
-function cbp(sp::Species)
-    sum(UInt64, sp.chromosome) <= typemax(UInt32) || throw(ArgumentError(
-        "the genome of $(sp.name) exceeds $(typemax(UInt32)) bp, the range of the UInt32 coordinate"))
-    return cumsum(sp.chromosome)
-end
+cbp(sp::Species) = sp.ends
 
 """
     M(sp::Species) -> UInt32
 
-Return the recombination scaling factor in base pairs per Morgan.
+Return the recombination scaling factor in base pairs per Morgan. Not exported
+(the name is too generic); call it as `BnGStructs.M(sp)` or read `sp.M`.
 
 For example, `100_000_000` base pairs per Morgan corresponds to 1 cM per 1 Mb (1% recombination per Mb).
 
@@ -875,13 +734,23 @@ For example, `100_000_000` base pairs per Morgan corresponds to 1 cM per 1 Mb (1
 using BnGStructs
 
 sp = Cattle(100)
-M(sp) # 0x05f5e100 (100_000_000)
+BnGStructs.M(sp) # 0x05f5e100 (100_000_000); the same as sp.M
 ```
 """
 M(sp::Species) = sp.M
 Base.length(sp::Species) = length(sp.chromosome)
 
+"""
+    map_length(sp::Species) -> Vector{Float64}
+
+Genetic length of each chromosome in Morgans (the `morgan` field):
+`chromosome ./ M` unless lengths were given to the constructor. Its sum is
+the genome length in Morgans, the expected number of crossovers per
+meiosis under a model without interference.
+"""
+map_length(sp::Species) = sp.morgan
+
 Base.show(io::IO, c::Species) = print(
-    io, nameof(typeof(c)), " \"", c.name, "\" with ", length(c.chromosome),
-    " chromosomes and ", c.nid, " individuals",
+    io, "Species \"", c.name, "\" with ", length(c.chromosome), " chromosomes, ",
+    Int(c.ends[end]), " bp, ", round(sum(c.morgan); digits = 3), " M",
 )

@@ -27,7 +27,7 @@ species.
 - `frq::Vector{Float32}`: Frequency of the alternate allele; empty if not recorded.
 - `morgan::Vector{Float64}`: Genetic position in Morgans **within the
   chromosome**, non-decreasing within each chromosome; empty if the map is
-  the uniform one implied by `M(sp)`.
+  the uniform one implied by the species ([`map_length`](@ref)).
 
 # Constructors
 - `VariantMap(chr, pos, ref, alt[, frq]; frq, morgan)`: from genome-wide coordinates.

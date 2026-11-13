@@ -26,6 +26,6 @@ export genotypic_value, breeding_value, trait_columns
 export chrpos, check_coordinates
 export packed, select_individuals, select_loci, dosage
 export write_haplotypes, read_haplotypes
-export name, nid, chromosome, M, total_bp, cbp
+export nid, chromosome, total_bp, cbp, map_length
 
 end # module BnGStructs

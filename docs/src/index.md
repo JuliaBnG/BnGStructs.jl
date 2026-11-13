@@ -35,19 +35,31 @@ logical matrix without exposing storage padding.
 
 ## Species metadata
 
-`Cattle`, `Sheep`, `Chicken`, `Pig`, `Goat`, `Horse`, `Rabbit`, `Cat`, and
-`Dog` supply curated autosomal chromosome lengths. Use `GenericSpecies` for a
-custom genome:
+`Species` is one concrete type. `Cattle`, `Sheep`, `Chicken`, `Pig`, `Goat`,
+`Horse`, `Rabbit`, `Cat`, and `Dog` construct it with curated autosomal
+chromosome lengths; `GenericSpecies` takes a custom genome:
 
 ```julia
-species = GenericSpecies("Example", 500, [10_000_000, 20_000_000])
-total_bp(species)
-cbp(species)
+species = GenericSpecies("Example", [10_000_000, 20_000_000])
+total_bp(species)     # 30000000
+cbp(species)          # cumulative chromosome ends, the genome-wide coordinate
+map_length(species)   # [0.1, 0.2] Morgans, from the default 1 cM/Mb
 ```
 
-The exported `name`, `nid`, `chromosome`, and `M` accessors provide the core
-metadata. `total_bp` returns total genome length, while `cbp` returns cumulative
-chromosome endpoints.
+By default every chromosome recombines at `M` base pairs per Morgan. Give
+`morgan` to set the genetic length of each chromosome, e.g. for
+microchromosomes or to give every chromosome at least 0.5 M:
+
+```julia
+chicken = Chicken()
+lengths = max.(map_length(chicken), 0.5)
+chicken = Chicken(; morgan = lengths)
+```
+
+A population size may still be passed as the first argument (`Cattle(1000)`)
+and read with `nid`, because FisherWright and BnGsim take it from there, but
+it is deprecated: a size belongs to a population, not to a species. The
+fields `name`, `chromosome` and `M` hold the rest of the metadata.
 
 ## Traits
 

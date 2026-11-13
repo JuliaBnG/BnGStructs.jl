@@ -52,44 +52,62 @@ end
     @test cattle isa Species
     @test cattle.name == "BosTau"
     @test cattle.nid == 1000
-    @test name(cattle) == "BosTau"
+    @test BnGStructs.name(cattle) == "BosTau"
+    @test !isdefined(@__MODULE__, :name) && !isdefined(@__MODULE__, :M)   # no longer exported
     @test nid(cattle) == 1000
     @test chromosome(cattle) == cattle.chromosome
-    @test M(cattle) == 80_000_000
+    @test BnGStructs.M(cattle) == 80_000_000
     @test length(cattle) == 29
     @test total_bp(cattle) == sum(cattle.chromosome)
     @test cbp(cattle) == cumsum(cattle.chromosome)
     @test cattle.M == 80_000_000
 
     sheep = Sheep(500)
-    @test sheep isa Sheep
+    @test sheep isa Species
     @test sheep.M == 100_000_000
 
     chicken = Chicken(200; M=90_000_000)
-    @test chicken isa Chicken
+    @test chicken isa Species
     @test chicken.M == 90_000_000
 
     pig = Pig(300)
-    @test pig isa Pig
+    @test pig isa Species
     goat = Goat(150)
-    @test goat isa Goat
+    @test goat isa Species
     horse = Horse(100)
-    @test horse isa Horse
+    @test horse isa Species
     rabbit = Rabbit(400)
-    @test rabbit isa Rabbit
+    @test rabbit isa Species
     cat = Cat(250)
-    @test cat isa Cat
+    @test cat isa Species
     dog = Dog(350)
-    @test dog isa Dog
+    @test dog isa Species
 
     gen = GenericSpecies("Custom", 500, [10_000_000, 20_000_000]; M=50_000_000)
-    @test gen isa GenericSpecies
+    @test gen isa Species
     @test gen.name == "Custom"
     @test gen.nid == 500
     @test length(gen) == 2
     @test total_bp(gen) == 30_000_000
     @test cbp(gen) == UInt32[10_000_000, 30_000_000]
     @test gen.M == 50_000_000
+
+    # one concrete type, ends stored, genetic lengths, optional population size
+    @test isconcretetype(Species) && eltype([cattle, sheep, gen]) === Species
+    @test cattle.ends === cbp(cattle)
+    @test map_length(gen) == [0.2, 0.4]
+    @test map_length(cattle) == cattle.chromosome ./ 80_000_000
+    micro = GenericSpecies("Micro", [50_000_000, 5_000_000]; morgan = [0.5, 0.5])
+    @test map_length(micro) == [0.5, 0.5] && micro.nid == 0
+    @test_throws ArgumentError nid(micro)
+    @test Cattle().nid == 0 && Cattle().chromosome == cattle.chromosome
+    @test map_length(Chicken(; morgan = max.(map_length(Chicken()), 0.5))) |> minimum == 0.5
+    @test_throws ArgumentError GenericSpecies("Bad", [1000, 1000]; morgan = [0.1])
+    @test_throws ArgumentError GenericSpecies("Bad", [1000, 1000]; morgan = [0.1, 0.0])
+    @test_throws ArgumentError GenericSpecies("Big", fill(2_000_000_000, 3))
+    @test occursin("not set", sprint(show, MIME("text/plain"), micro))
+    old = GenericSpecies("Old", Int32(8), UInt32[100_000, 200_000], UInt32(50_000))
+    @test old.nid == 8 && old.M == 50_000 && map_length(old) == [2.0, 4.0]
 
     @test_throws ArgumentError GenericSpecies("Bad", -1, [1000])
     @test_throws ArgumentError GenericSpecies("Bad", 10, Int[])
