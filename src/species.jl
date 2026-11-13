@@ -851,7 +851,11 @@ sp = GenericSpecies("Toy", 10, [1_000, 2_000, 3_000])
 cbp(sp) # UInt32[1000, 3000, 6000]
 ```
 """
-cbp(sp::Species) = cumsum(sp.chromosome)
+function cbp(sp::Species)
+    sum(UInt64, sp.chromosome) <= typemax(UInt32) || throw(ArgumentError(
+        "the genome of $(sp.name) exceeds $(typemax(UInt32)) bp, the range of the UInt32 coordinate"))
+    return cumsum(sp.chromosome)
+end
 
 """
     M(sp::Species) -> UInt32

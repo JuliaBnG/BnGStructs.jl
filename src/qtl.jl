@@ -12,9 +12,15 @@ dominance deviations (d).
 - `loci::Vector{Int32}`: Unique 1-based indices of QTL loci into a [`VariantMap`](@ref).
 - `additive::Vector{Float64}`: Additive effect sizes (α) per QTL locus.
 - `dominance::Vector{Float64}`: Optional dominance effect sizes (d) per QTL locus (empty if purely additive).
+- `intercept::Float64`: Constant added to every genotypic value (default `0.0`). Use it to
+  place the base-population mean without shifting the sampled effects.
+
+Genotype values at a locus are `0`, `a + d` and `2a` for 0, 1 and 2 copies
+of the alternate allele, so `a` is half the difference between the
+homozygotes and `d` the deviation of the heterozygote from their midpoint.
 
 # Constructors
-    TraitQTL(name::AbstractString, loci::Vector{<:Integer}, additive::Vector{<:Real}; dominance::Vector{<:Real} = Float64[]) -> TraitQTL
+    TraitQTL(name, loci, additive; dominance = Float64[], intercept = 0.0) -> TraitQTL
 
 Construct a single-trait QTL architecture. Requires that `loci` and `additive` vectors have
 the same length, all locus indices are positive and unique, and that `dominance` (if provided)
@@ -40,12 +46,14 @@ struct TraitQTL
     loci::Vector{Int32}
     additive::Vector{Float64}
     dominance::Vector{Float64}
+    intercept::Float64
 
     function TraitQTL(
         name::AbstractString,
-        loci::Vector{<:Integer},
-        additive::Vector{<:Real};
-        dominance::Vector{<:Real} = Float64[],
+        loci::AbstractVector{<:Integer},
+        additive::AbstractVector{<:Real};
+        dominance::AbstractVector{<:Real} = Float64[],
+        intercept::Real = 0.0,
     )
         n = length(loci)
         length(additive) == n || throw(ArgumentError("loci and additive effect vectors must have the same length"))
@@ -54,7 +62,8 @@ struct TraitQTL
         end
         all(loci .> 0) || throw(ArgumentError("Locus indices must be positive integers"))
         allunique(loci) || throw(ArgumentError("Locus indices must be unique"))
-        new(String(name), Int32.(loci), Float64.(additive), Float64.(dominance))
+        isfinite(intercept) || throw(ArgumentError("intercept must be finite"))
+        new(String(name), Int32.(loci), Float64.(additive), Float64.(dominance), Float64(intercept))
     end
 end
 
@@ -78,6 +87,7 @@ Enables high-performance BLAS matrix multiplications for calculating True Breedi
 - `loci::Vector{Int32}`: Sorted unique 1-based indices of all union QTL loci into a [`VariantMap`](@ref).
 - `additive::Matrix{Float64}`: Additive effect matrix of dimension `(length(loci), length(trait_names))`.
 - `dominance::Matrix{Float64}`: Dominance effect matrix of dimension `(length(loci), length(trait_names))` (or empty `0 × 0` matrix).
+- `intercept::Vector{Float64}`: One constant per trait, added to every genotypic value (default zeros).
 
 # Constructors
 - `MultiTraitQTL(trait_names::Vector{<:AbstractString}, loci::Vector{<:Integer}, additive::Matrix{<:Real}; dominance = Matrix{Float64}(undef, 0, 0))`
@@ -101,12 +111,14 @@ struct MultiTraitQTL
     loci::Vector{Int32}
     additive::Matrix{Float64}   # (n_qtl × n_traits)
     dominance::Matrix{Float64}  # (n_qtl × n_traits), optional (empty if none)
+    intercept::Vector{Float64}  # one per trait
 
     function MultiTraitQTL(
-        trait_names::Vector{<:AbstractString},
-        loci::Vector{<:Integer},
-        additive::Matrix{<:Real};
-        dominance::Matrix{<:Real} = Matrix{Float64}(undef, 0, 0),
+        trait_names::AbstractVector{<:AbstractString},
+        loci::AbstractVector{<:Integer},
+        additive::AbstractMatrix{<:Real};
+        dominance::AbstractMatrix{<:Real} = Matrix{Float64}(undef, 0, 0),
+        intercept::AbstractVector{<:Real} = zeros(length(trait_names)),
     )
         k = length(loci)
         t = length(trait_names)
@@ -118,7 +130,9 @@ struct MultiTraitQTL
         end
         all(loci .> 0) || throw(ArgumentError("Locus indices must be positive integers"))
         allunique(loci) || throw(ArgumentError("Locus indices must be unique"))
-        new(String.(trait_names), Int32.(loci), Float64.(additive), Float64.(dominance))
+        length(intercept) == t && all(isfinite, intercept) ||
+            throw(ArgumentError("intercept needs one finite value per trait"))
+        new(String.(trait_names), Int32.(loci), Float64.(additive), Float64.(dominance), Float64.(intercept))
     end
 end
 
@@ -164,7 +178,10 @@ function MultiTraitQTL(traits::Vector{TraitQTL})
         end
     end
     
-    return MultiTraitQTL(trait_names, all_loci, additive; dominance = dominance)
+    return MultiTraitQTL(
+        trait_names, all_loci, additive;
+        dominance = dominance, intercept = [t.intercept for t in traits],
+    )
 end
 
 function Base.show(io::IO, mqtl::MultiTraitQTL)
@@ -172,28 +189,103 @@ function Base.show(io::IO, mqtl::MultiTraitQTL)
 end
 
 #
-# True Breeding Value (TBV) Calculations
+# Genotypic values, additive genetic values and breeding values
 #
 
+# Dosage of the alternate allele of individual `ind` at locus `loc`.
+@inline _dosage(hap::Haplotype, loc, ind) =
+    @inbounds Int(hap.gt[loc, 2ind-1]) + Int(hap.gt[loc, 2ind])
+@inline _dosage(gt::Genotype, loc, ind) =
+    @inbounds Int(gt.gt[ind, 2loc-1]) + Int(gt.gt[ind, 2loc])
+_nid(hap::Haplotype) = hap.nhp ÷ 2
+_nid(gt::Genotype) = gt.nid
+_nlc(hap::Haplotype) = hap.nlc
+_nlc(gt::Genotype) = gt.nas ÷ 2
+
+function _check_loci(g::Union{Haplotype,Genotype}, loci)
+    isempty(loci) || maximum(loci) <= _nlc(g) ||
+        throw(ArgumentError("QTL locus $(maximum(loci)) is beyond the $(_nlc(g)) loci of the genotypes"))
+    return nothing
+end
+
 """
-    tbv(hap::Haplotype, qtl::TraitQTL) -> Vector{Float64}
+    genotypic_value(g::Union{Haplotype,Genotype}, qtl::TraitQTL) -> Vector{Float64}
+    genotypic_value(g::Union{Haplotype,Genotype}, qtl::MultiTraitQTL) -> Matrix{Float64}
 
-Calculate True Breeding Values (TBV) for all individuals from a locus-major `Haplotype`
-matrix and a single-trait [`TraitQTL`](@ref).
+Genotypic value of every individual: with dosage ``z_{ij} \\in \\{0, 1, 2\\}``
+of the alternate allele of individual ``i`` at QTL ``j``,
 
-For each individual `i`, dosage `Z_j = h[j, 2i-1] + h[j, 2i] ∈ {0, 1, 2}` is evaluated
-at each QTL locus `j`. The individual's genetic value is:
 ```math
-\\text{TBV}_i = \\sum_{j=1}^K Z_{ij} \\alpha_j + \\sum_{j: Z_{ij} = 1} d_j
+G_i = \\mu + \\sum_j z_{ij} a_j + \\sum_{j:\\, z_{ij} = 1} d_j ,
 ```
-where `α` denotes additive effect sizes and `d` denotes dominance deviations (for heterozygous loci).
 
-# Arguments
-- `hap::Haplotype`: Phased haplotype matrix of dimension `(nlc, 2 * nid)`.
-- `qtl::TraitQTL`: Single-trait QTL architecture.
+where ``\\mu`` is `qtl.intercept`, ``a`` is `qtl.additive` and ``d`` is
+`qtl.dominance`. Loci are independent in their effects (no epistasis). The
+multi-trait method returns an `nid × ntraits` matrix.
 
-# Returns
-- `Vector{Float64}`: Vector of length `nid` containing TBVs for each individual.
+With no dominance this is the additive genetic value, which [`tbv`](@ref)
+returns under its usual name. With dominance it is **not** a breeding
+value; see [`breeding_value`](@ref).
+
+# Examples
+```julia
+using BnGStructs
+
+hps = Haplotype(10, 4)                  # 10 loci, 2 individuals
+hps[1, 1] = true; hps[1, 2] = true      # individual 1 is homozygous at locus 1
+hps[1, 3] = true                        # individual 2 is heterozygous
+qtl = TraitQTL("T", [1], [1.5]; dominance = [0.5])
+genotypic_value(hps, qtl)               # [3.0, 2.0]
+```
+"""
+function genotypic_value(g::Union{Haplotype,Genotype}, qtl::TraitQTL)
+    loci, eff, dom = qtl.loci, qtl.additive, qtl.dominance
+    _check_loci(g, loci)
+    has_dom = !isempty(dom)
+    vals = fill(qtl.intercept, _nid(g))
+    @inbounds for ind in eachindex(vals)
+        val = 0.0
+        for j in eachindex(loci)
+            z = _dosage(g, loci[j], ind)
+            val += z * eff[j]
+            has_dom && z == 1 && (val += dom[j])
+        end
+        vals[ind] += val
+    end
+    return vals
+end
+
+function genotypic_value(g::Union{Haplotype,Genotype}, mqtl::MultiTraitQTL)
+    loci = mqtl.loci
+    _check_loci(g, loci)
+    nid, k = _nid(g), length(loci)
+    Z = Matrix{Float64}(undef, nid, k)
+    @inbounds for j = 1:k, ind = 1:nid
+        Z[ind, j] = _dosage(g, loci[j], ind)
+    end
+    vals = Z * mqtl.additive
+    if !isempty(mqtl.dominance)
+        vals .+= (Z .== 1.0) * mqtl.dominance
+    end
+    vals .+= mqtl.intercept'
+    return vals
+end
+
+_has_dominance(qtl::TraitQTL) = any(!iszero, qtl.dominance)
+_has_dominance(qtl::MultiTraitQTL) = any(!iszero, qtl.dominance)
+
+"""
+    tbv(g::Union{Haplotype,Genotype}, qtl::TraitQTL) -> Vector{Float64}
+    tbv(g::Union{Haplotype,Genotype}, qtl::MultiTraitQTL) -> Matrix{Float64}
+
+True breeding value under an **additive** architecture:
+``\\mu + \\sum_j z_{ij} a_j``, the same as [`genotypic_value`](@ref). The
+values are not centred; they include `qtl.intercept` and the mean of the
+population at hand.
+
+Throws an `ArgumentError` if `qtl` has non-zero dominance effects, because
+the sum above is then neither the genotypic value nor the breeding value.
+Use [`genotypic_value`](@ref) or [`breeding_value`](@ref) instead.
 
 # Examples
 ```julia
@@ -205,194 +297,85 @@ qtl = TraitQTL("Trait1", [1], [1.5])
 tbv(hps, qtl) # [3.0, 0.0]
 ```
 """
-function tbv(hap::Haplotype, qtl::TraitQTL)
-    nid = hap.nhp ÷ 2
-    tbvs = zeros(Float64, nid)
+function tbv(g::Union{Haplotype,Genotype}, qtl::Union{TraitQTL,MultiTraitQTL})
+    _has_dominance(qtl) && throw(ArgumentError(
+        "tbv is defined for additive architectures; with dominance use " *
+        "genotypic_value (G) or breeding_value (A)"))
+    return genotypic_value(g, qtl)
+end
+
+"""
+    breeding_value(g, qtl::TraitQTL; p = nothing) -> Vector{Float64}
+    breeding_value(g, qtl::MultiTraitQTL; p = nothing) -> Matrix{Float64}
+
+Breeding value (additive genetic value) of every individual, as a
+deviation from the mean of the reference population:
+
+```math
+A_i = \\sum_j (z_{ij} - 2p_j)\\,\\alpha_j, \\qquad
+\\alpha_j = a_j + d_j (1 - 2p_j),
+```
+
+where ``p_j`` is the frequency of the alternate allele at QTL ``j`` in the
+reference population and ``\\alpha_j`` is the average effect of an allele
+substitution there. `p` gives those frequencies, one per QTL in the order
+of `qtl.loci`; by default they are the frequencies among the individuals
+of `g`, which makes that sample the reference population.
+
+Assumptions: a randomly mating reference population in Hardy–Weinberg
+proportions, and effects that add across loci. Under linkage
+disequilibrium the values are still the sum of single-locus breeding
+values; their variance then includes covariances between loci.
+
+With no dominance, `breeding_value(g, qtl)` equals
+`tbv(g, qtl) .- mean(tbv(g, qtl))` when `p` is taken from `g`.
+"""
+function breeding_value(
+    g::Union{Haplotype,Genotype},
+    qtl::TraitQTL;
+    p::Union{Nothing,AbstractVector{<:Real}} = nothing,
+)
     loci = qtl.loci
-    eff = qtl.additive
-    dom = qtl.dominance
-    has_dom = !isempty(dom)
-    k = length(loci)
-
-    @inbounds for ind = 1:nid
-        h1_col = 2ind - 1
-        h2_col = 2ind
-        val = 0.0
-        for j = 1:k
-            loc = loci[j]
-            a1 = Int(hap.gt[loc, h1_col])
-            a2 = Int(hap.gt[loc, h2_col])
-            dosage = a1 + a2
-            val += dosage * eff[j]
-            if has_dom && (dosage == 1)
-                val += dom[j]
-            end
-        end
-        tbvs[ind] = val
-    end
-    return tbvs
-end
-
-"""
-    tbv(gt::Genotype, qtl::TraitQTL) -> Vector{Float64}
-
-Calculate True Breeding Values (TBV) for all individuals from an individual-major `Genotype`
-matrix and a single-trait [`TraitQTL`](@ref).
-
-For each individual `i` and QTL locus `l_j`, allele dosage `Z_ij = g[i, 2l_j-1] + g[i, 2l_j] ∈ {0, 1, 2}`.
-The individual's genetic value is:
-```math
-\\text{TBV}_i = \\sum_{j=1}^K Z_{ij} \\alpha_j + \\sum_{j: Z_{ij} = 1} d_j
-```
-
-# Arguments
-- `gt::Genotype`: Phased genotype matrix of dimension `(nid, 2 * nlc)`.
-- `qtl::TraitQTL`: Single-trait QTL architecture.
-
-# Returns
-- `Vector{Float64}`: Vector of length `nid` containing TBVs for each individual.
-
-# Examples
-```julia
-using BnGStructs
-
-gt = Genotype(2, 20) # 2 individuals, 10 loci
-gt[1, 1] = true; gt[1, 2] = true # individual 1 homozygous at locus 1 (dosage = 2)
-qtl = TraitQTL("Trait1", [1], [1.5])
-tbv(gt, qtl) # [3.0, 0.0]
-```
-"""
-function tbv(gt::Genotype, qtl::TraitQTL)
-    nid = gt.nid
-    tbvs = zeros(Float64, nid)
-    loci = qtl.loci
-    eff = qtl.additive
-    dom = qtl.dominance
-    has_dom = !isempty(dom)
-    k = length(loci)
-
-    @inbounds for ind = 1:nid
-        val = 0.0
-        for j = 1:k
-            loc = loci[j]
-            a1 = Int(gt.gt[ind, 2loc - 1])
-            a2 = Int(gt.gt[ind, 2loc])
-            dosage = a1 + a2
-            val += dosage * eff[j]
-            if has_dom && (dosage == 1)
-                val += dom[j]
-            end
-        end
-        tbvs[ind] = val
-    end
-    return tbvs
-end
-
-"""
-    tbv(hap::Haplotype, mqtl::MultiTraitQTL) -> Matrix{Float64}
-
-Calculate True Breeding Values (TBV) for all individuals across multiple traits from
-a locus-major `Haplotype` matrix and a [`MultiTraitQTL`](@ref).
-
-Extracts the dosage submatrix `Z` of size `(nid, K)` across the `K` union QTL loci and
-computes the additive component via optimized BLAS matrix multiplication:
-```math
-\\mathbf{TBV} = Z \\mathbf{A} + \\mathbf{D}
-```
-where `A` is the `(K × T)` additive effect matrix and `D` accounts for dominance
-deviations on heterozygous genotypes (`Z_ij = 1`).
-
-# Arguments
-- `hap::Haplotype`: Phased haplotype matrix of dimension `(nlc, 2 * nid)`.
-- `mqtl::MultiTraitQTL`: Joint multi-trait QTL architecture across `T` traits.
-
-# Returns
-- `Matrix{Float64}`: Matrix of dimension `(nid, T)` containing TBVs for all individuals across all traits.
-"""
-function tbv(hap::Haplotype, mqtl::MultiTraitQTL)
-    nid = hap.nhp ÷ 2
-    n_traits = length(mqtl.trait_names)
-    k = length(mqtl.loci)
-    
-    # Extract dosage submatrix (nid × k)
-    Z = Matrix{Float64}(undef, nid, k)
-    loci = mqtl.loci
-    
-    @inbounds for j = 1:k
-        loc = loci[j]
+    _check_loci(g, loci)
+    nid = _nid(g)
+    freq = _qtl_frequencies(g, loci, p)
+    vals = zeros(nid)
+    has_dom = !isempty(qtl.dominance)
+    @inbounds for j in eachindex(loci)
+        pj = freq[j]
+        α = qtl.additive[j] + (has_dom ? qtl.dominance[j] * (1 - 2pj) : 0.0)
         for ind = 1:nid
-            Z[ind, j] = Float64(Int(hap.gt[loc, 2ind - 1]) + Int(hap.gt[loc, 2ind]))
+            vals[ind] += (_dosage(g, loci[j], ind) - 2pj) * α
         end
     end
-    
-    # Linear algebra BLAS multiplication: (nid × k) * (k × n_traits) -> (nid × n_traits)
-    tbvs = Z * mqtl.additive
-    
-    # Add dominance if present
-    if !isempty(mqtl.dominance)
-        @inbounds for ind = 1:nid
-            for j = 1:k
-                if Z[ind, j] == 1.0
-                    for tr = 1:n_traits
-                        tbvs[ind, tr] += mqtl.dominance[j, tr]
-                    end
-                end
-            end
-        end
-    end
-    
-    return tbvs
+    return vals
 end
 
-"""
-    tbv(gt::Genotype, mqtl::MultiTraitQTL) -> Matrix{Float64}
-
-Calculate True Breeding Values (TBV) for all individuals across multiple traits from
-an individual-major `Genotype` matrix and a [`MultiTraitQTL`](@ref).
-
-Extracts the dosage submatrix `Z` of size `(nid, K)` across the `K` union QTL loci and
-computes the additive component via optimized BLAS matrix multiplication:
-```math
-\\mathbf{TBV} = Z \\mathbf{A} + \\mathbf{D}
-```
-where `A` is the `(K × T)` additive effect matrix and `D` accounts for dominance
-deviations on heterozygous genotypes (`Z_ij = 1`).
-
-# Arguments
-- `gt::Genotype`: Phased genotype matrix of dimension `(nid, 2 * nlc)`.
-- `mqtl::MultiTraitQTL`: Joint multi-trait QTL architecture across `T` traits.
-
-# Returns
-- `Matrix{Float64}`: Matrix of dimension `(nid, T)` containing TBVs for all individuals across all traits.
-"""
-function tbv(gt::Genotype, mqtl::MultiTraitQTL)
-    nid = gt.nid
-    n_traits = length(mqtl.trait_names)
-    k = length(mqtl.loci)
-    
-    Z = Matrix{Float64}(undef, nid, k)
+function breeding_value(
+    g::Union{Haplotype,Genotype},
+    mqtl::MultiTraitQTL;
+    p::Union{Nothing,AbstractVector{<:Real}} = nothing,
+)
     loci = mqtl.loci
-    
-    @inbounds for j = 1:k
-        loc = loci[j]
-        for ind = 1:nid
-            Z[ind, j] = Float64(Int(gt.gt[ind, 2loc - 1]) + Int(gt.gt[ind, 2loc]))
-        end
+    _check_loci(g, loci)
+    nid, k = _nid(g), length(loci)
+    freq = _qtl_frequencies(g, loci, p)
+    Z = Matrix{Float64}(undef, nid, k)
+    @inbounds for j = 1:k, ind = 1:nid
+        Z[ind, j] = _dosage(g, loci[j], ind) - 2freq[j]
     end
-    
-    tbvs = Z * mqtl.additive
-    
-    if !isempty(mqtl.dominance)
-        @inbounds for ind = 1:nid
-            for j = 1:k
-                if Z[ind, j] == 1.0
-                    for tr = 1:n_traits
-                        tbvs[ind, tr] += mqtl.dominance[j, tr]
-                    end
-                end
-            end
-        end
+    α = isempty(mqtl.dominance) ? mqtl.additive :
+        mqtl.additive .+ mqtl.dominance .* (1 .- 2 .* freq)
+    return Z * α
+end
+
+function _qtl_frequencies(g::Union{Haplotype,Genotype}, loci, p)
+    if p !== nothing
+        length(p) == length(loci) ||
+            throw(DimensionMismatch("p needs one frequency per QTL ($(length(loci)))"))
+        all(x -> 0 <= x <= 1, p) || throw(ArgumentError("frequencies must lie in [0, 1]"))
+        return Float64.(p)
     end
-    
-    return tbvs
+    nid = _nid(g)
+    return [sum(_dosage(g, l, ind) for ind = 1:nid) / 2nid for l in loci]
 end

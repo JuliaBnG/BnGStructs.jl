@@ -8,7 +8,6 @@ Abstract supertype for all genetic traits (quantitative and threshold/categorica
 # Subtypes
 - [`Trait`](@ref): Abstract supertype for continuous traits with a population mean `μ` (e.g. [`aTrait`](@ref)).
 - [`tTrait`](@ref): Concrete type for threshold/ordinal traits modeled via liability thresholds.
-- Planned trait architectures: [`adTrait`](@ref), [`adiTrait`](@ref), [`dtTrait`](@ref), [`ditTrait`](@ref).
 """
 abstract type AbstractTrait end
 
@@ -20,42 +19,6 @@ Abstract supertype for continuous (non-threshold) quantitative traits.
 Subtypes of `Trait` possess a population phenotypic mean field `μ`.
 """
 abstract type Trait <: AbstractTrait end # non-threshold traits
-
-"""
-    struct adTrait <: Trait
-
-Planned trait type with additive and dominance genetic effects.
-"""
-struct adTrait <: Trait
-    name::String
-end
-
-"""
-    struct adiTrait <: Trait
-
-Planned trait type with additive, dominance, and epistatic interaction effects.
-"""
-struct adiTrait <: Trait
-    name::String
-end
-
-"""
-    struct dtTrait <: AbstractTrait
-
-Planned threshold trait type with dominance genetic effects.
-"""
-struct dtTrait <: AbstractTrait
-    name::String
-end
-
-"""
-    struct ditTrait <: AbstractTrait
-
-Planned threshold trait type with dominance and epistatic interaction effects.
-"""
-struct ditTrait <: AbstractTrait
-    name::String
-end
 
 """
     struct aTrait{D<:Distribution} <: Trait
@@ -269,3 +232,29 @@ end
 
 Base.show(io::IO, trt::AbstractTrait) =
     print(io, nameof(typeof(trt)), " \"", trt.name, "\"")
+
+"""
+    trait_columns(trait::AbstractTrait) -> NamedTuple
+    trait_columns(name::AbstractString) -> NamedTuple
+
+Names of the columns that hold the records of a trait in an animal table
+(a `DataFrame` or any other table with one row per individual). This is
+the one place the convention is defined; BnGsim writes these columns and
+Breeding reads them.
+
+| Field | Column | Content |
+| :--- | :--- | :--- |
+| `tbv` | `tbv_<name>` | true genetic value from the simulation |
+| `phenotype` | `ft_<name>` | phenotype; `missing` where not expressed or not recorded |
+| `ebv` | `ebv_<name>` | estimated breeding value |
+
+# Examples
+```julia
+using BnGStructs
+
+trait_columns(Trait("milk")).phenotype  # "ft_milk"
+```
+"""
+trait_columns(name::AbstractString) =
+    (tbv = "tbv_" * name, phenotype = "ft_" * name, ebv = "ebv_" * name)
+trait_columns(trait::AbstractTrait) = trait_columns(trait.name)

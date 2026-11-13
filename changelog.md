@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0 (unreleased)
+
+Breaking release: the contracts that FisherWright, RelationshipMatrices,
+Breeding and BnGsim rely on are now written down and enforced.
+
+### Breaking
+
+- `VariantMap.pos` is the genome-wide base-pair coordinate (chromosomes
+  end to end), and the constructor requires it to be strictly increasing
+  and `chr` to be non-decreasing. This was already how FisherWright and
+  BnGsim used it; the documentation described a within-chromosome
+  position and nothing was checked. Maps with within-chromosome positions
+  must be built with `VariantMap(chr, chrpos, species)`. `vm[idxs]`
+  requires increasing indices.
+- `tbv` throws for a QTL architecture with non-zero dominance effects.
+  It used to return the genotypic value under the name of a breeding
+  value. Use `genotypic_value` or `breeding_value`.
+- `VariantMap`, `TraitQTL` and `MultiTraitQTL` have a new last field
+  (`morgan`, `intercept`), which changes their positional inner
+  constructors. The documented constructors are unchanged.
+- The unexported placeholder types `adTrait`, `adiTrait`, `dtTrait` and
+  `ditTrait` are removed.
+- `cbp` throws for a genome beyond the `UInt32` coordinate range instead
+  of wrapping around.
+
+### New
+
+- `chrpos`, `check_coordinates`, `VariantMap(pos, species)` and
+  `VariantMap(chr, chrpos, species)`.
+- Optional genetic positions (`morgan`, Morgans within the chromosome) in
+  `VariantMap`.
+- `genotypic_value` and `breeding_value` (average effects at stated
+  reference frequencies).
+- `intercept` in `TraitQTL` and `MultiTraitQTL`, so a base-population
+  mean can be set without shifting the sampled effects.
+- `select_individuals`, `select_loci`, `dosage` and `packed`.
+- `write_haplotypes` and `read_haplotypes` for the `BNGH1` format.
+- `trait_columns`: the record-column convention shared by BnGsim and
+  Breeding.
+
+### Not in this release
+
+Collapsing the ten species types into one, moving population size out of
+`Species`, dropping `aTrait.QTL`, and a single trait hierarchy are
+planned for 0.3.x or 0.4 (see the JuliaBnG roadmap).
+
 ## 0.2.8 (unreleased)
 
 - Argument validation throws `ArgumentError` or `DimensionMismatch`

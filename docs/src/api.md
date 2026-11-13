@@ -27,3 +27,10 @@ Pages = ["trait.jl", "snpset.jl"]
 Modules = [BnGStructs]
 Pages = ["variantmap.jl", "locusset.jl", "qtl.jl"]
 ```
+
+## Subsets, dosages and files
+
+```@autodocs
+Modules = [BnGStructs]
+Pages = ["subset.jl", "io.jl"]
+```

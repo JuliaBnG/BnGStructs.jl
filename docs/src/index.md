@@ -64,13 +64,43 @@ normalized internally without modifying the input vector.
 ## Variant maps and QTL architectures
 
 `VariantMap` stores per-locus metadata, while `LocusSet` names a sorted, unique
-subset of its one-based locus indices. `TraitQTL` and `MultiTraitQTL` represent
-additive and optional dominance effects; `tbv` calculates true breeding values
-from a `Haplotype` or `Genotype`:
+subset of its one-based locus indices.
+
+Positions in a `VariantMap` are **genome-wide** base-pair coordinates:
+chromosomes are laid end to end in the order of the species, and `pos` is
+strictly increasing. This is the coordinate FisherWright simulates on and
+BnGsim's meiosis searches. Build a map from within-chromosome positions
+with a species, and recover them with `chrpos`:
 
 ```julia
-map = VariantMap([1, 1], [100, 200], ['A', 'C'], ['G', 'T'])
+species = GenericSpecies("Example", 500, [10_000, 20_000])
+map = VariantMap([1, 1, 2], [100, 200, 150], species)   # chr, position on the chromosome
+map.pos                                                # UInt32[100, 200, 10150]
+chrpos(map, species)                                   # UInt32[100, 200, 150]
+check_coordinates(map, species)                        # true
 panel = LocusSet("Example panel", [1, 2])
-qtl = TraitQTL("Example trait", [1], [0.5])
+```
+
+`TraitQTL` and `MultiTraitQTL` hold additive effects, optional dominance
+effects and an intercept. Three functions turn genotypes into values, and
+they differ once there is dominance:
+
+| Function | Value | Use |
+| :--- | :--- | :--- |
+| `genotypic_value` | ``G = \mu + \sum z a + \sum_{\text{het}} d`` | what a phenotype is built on |
+| `tbv` | ``\mu + \sum z a`` | additive architectures only; throws if there is dominance |
+| `breeding_value` | ``A = \sum (z - 2p)\alpha``, ``\alpha = a + d(1 - 2p)`` | what an EBV estimates; depends on the reference frequencies `p` |
+
+```julia
+qtl = TraitQTL("Example trait", [1], [0.5]; intercept = 10.0)
 values = tbv(haplotypes, qtl)
 ```
+
+## Subsets, dosages and files
+
+`select_individuals` and `select_loci` return new `Haplotype`s, `dosage`
+returns allele counts, and `packed` gives other packages the bit storage.
+`write_haplotypes` and `read_haplotypes` use the `BNGH1` format, which is
+also what the msprime founder scripts write. `trait_columns` defines the
+column names (`tbv_<name>`, `ft_<name>`, `ebv_<name>`) under which BnGsim
+and Breeding exchange records.
