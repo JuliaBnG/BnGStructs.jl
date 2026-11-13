@@ -51,18 +51,21 @@ and exclusivity flag.
 - `SNPSet`: Initialized SNP set specification.
 """
 function SNPSet(name::String, nlc::Int; maf = 0.0, exclusive = false)
-    0.0 ≤ maf < 0.5 || error("maf must be in [0.0, 0.5)")
-    nlc > 0 || error("nlc must be positive")
+    0.0 ≤ maf < 0.5 || throw(ArgumentError("maf must be in [0.0, 0.5)"))
+    nlc > 0 || throw(ArgumentError("nlc must be positive"))
     SNPSet(name, nlc, maf, exclusive)
 end
 
 """
-    Base.show(io::IO, snp::SNPSet)
+    Base.show(io::IO, ::MIME"text/plain", snp::SNPSet)
 Display the SNPSet object `snp` in a human-readable format.
 """
-function Base.show(io::IO, snp::SNPSet)
+function Base.show(io::IO, ::MIME"text/plain", snp::SNPSet)
     println(io, "                      SNPSet: ", snp.name)
     println(io, "              Number of loci: ", snp.nlc)
     println(io, "Minor allele frequency (MAF): ", snp.maf)
     println(io, "                   Exclusive: ", snp.exclusive)
 end
+
+Base.show(io::IO, snp::SNPSet) =
+    print(io, "SNPSet \"", snp.name, "\" with ", snp.nlc, " loci (MAF > ", snp.maf, ")")

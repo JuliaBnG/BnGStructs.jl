@@ -164,12 +164,12 @@ function Trait(
     da = Normal(),
 )
     occursin(r"^[[:alpha:]_\p{L}][\p{L}\p{N}_]*$", name) ||
-        error("Name must be valid for a data frame column name")
-    sex ∈ 0:2 || error("Sex can only be in 0:2")
-    isfinite(age) && age ≥ 0 || error("Age must be finite and non-negative")
-    isfinite(h²) && 0.0 < h² ≤ 1.0 || error("h² must be finite and in (0, 1]")
-    isfinite(μ) || error("μ must be finite")
-    isfinite(σₐ) && σₐ > 0 || error("σₐ must be finite and positive")
+        throw(ArgumentError("Name must be valid for a data frame column name"))
+    sex ∈ 0:2 || throw(ArgumentError("Sex can only be in 0:2"))
+    isfinite(age) && age ≥ 0 || throw(ArgumentError("Age must be finite and non-negative"))
+    isfinite(h²) && 0.0 < h² ≤ 1.0 || throw(ArgumentError("h² must be finite and in (0, 1]"))
+    isfinite(μ) || throw(ArgumentError("μ must be finite"))
+    isfinite(σₐ) && σₐ > 0 || throw(ArgumentError("σₐ must be finite and positive"))
     aTrait(String(name), sex, Float64(age), Float64(h²), Symbol(QTL), Float64(μ), Float64(σₐ), da)
 end
 
@@ -228,16 +228,16 @@ function Trait(
     da = Normal(),
 )
     occursin(r"^[[:alpha:]_\p{L}][\p{L}\p{N}_]*$", name) ||
-        error("Name must be valid for a data frame column name")
-    length(weight) ≥ 2 || error("At least two category weights are required")
+        throw(ArgumentError("Name must be valid for a data frame column name"))
+    length(weight) ≥ 2 || throw(ArgumentError("At least two category weights are required"))
     all(isfinite, weight) && all(>(0), weight) ||
-        error("Weights must be finite and positive")
-    sex ∈ 0:2 || error("Sex can only be in 0:2")
-    isfinite(age) && age ≥ 0 || error("Age must be finite and non-negative")
-    isfinite(h²) && 0.0 < h² ≤ 1.0 || error("h² must be finite and in (0, 1]")
+        throw(ArgumentError("Weights must be finite and positive"))
+    sex ∈ 0:2 || throw(ArgumentError("Sex can only be in 0:2"))
+    isfinite(age) && age ≥ 0 || throw(ArgumentError("Age must be finite and non-negative"))
+    isfinite(h²) && 0.0 < h² ≤ 1.0 || throw(ArgumentError("h² must be finite and in (0, 1]"))
     normalized_weight = Float64.(weight)
     total_weight = sum(normalized_weight)
-    isfinite(total_weight) || error("Weights must have a finite sum")
+    isfinite(total_weight) || throw(ArgumentError("Weights must have a finite sum"))
     normalized_weight ./= total_weight
     σₚ = sqrt(1.0 / h²)
     threshold = map(
@@ -247,7 +247,7 @@ function Trait(
     tTrait(String(name), threshold, sex, Float64(age), Float64(h²), Symbol(QTL), 1.0, da)
 end
 
-function Base.show(io::IO, trt::AbstractTrait)
+function Base.show(io::IO, ::MIME"text/plain", trt::AbstractTrait)
     println(io, "             Name: $(trt.name)")
     isa(trt, tTrait) && println(io, "       Thresholds: $(trt.threshold)")
     if trt.sex == 0
@@ -266,3 +266,6 @@ function Base.show(io::IO, trt::AbstractTrait)
     println(io, "         std(TBV): $(trt.σₐ)")
     println(io, " QTL add. distri.: $(trt.da)")
 end
+
+Base.show(io::IO, trt::AbstractTrait) =
+    print(io, nameof(typeof(trt)), " \"", trt.name, "\"")

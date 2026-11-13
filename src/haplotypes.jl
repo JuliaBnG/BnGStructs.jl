@@ -44,10 +44,10 @@ struct Haplotype <: AbstractMatrix{Bool}
     nhp::Int   # number of haplotypes (columns in gt)
     gt::BitMatrix
     function Haplotype(nlc::Int, nhp::Int, gt::BitMatrix)
-        nlc > 0 || error("nlc must be positive")
-        (nhp > 0 && iseven(nhp)) || error("nhp must be positive and even")
-        size(gt, 1) == 64 * cld(nlc, 64) || error("Number of rows of gt does not match nlc")
-        size(gt, 2) == nhp || error("Number of columns of gt does not match nhp")
+        nlc > 0 || throw(ArgumentError("nlc must be positive"))
+        (nhp > 0 && iseven(nhp)) || throw(ArgumentError("nhp must be positive and even"))
+        size(gt, 1) == 64 * cld(nlc, 64) || throw(DimensionMismatch("Number of rows of gt does not match nlc"))
+        size(gt, 2) == nhp || throw(DimensionMismatch("Number of columns of gt does not match nhp"))
         # zero out padded rows beyond nlc
         _mask_last_word_columns!(gt, nlc)
         new(nlc, nhp, gt)
@@ -67,8 +67,8 @@ Construct an all-zero (`false`) `Haplotype` object with `nlc` loci and `nhp` hap
 - `Haplotype`: An initialized haplotype matrix backed by a zero-filled, 64-bit-aligned `BitMatrix`.
 """
 function Haplotype(nlc::Int, nhp::Int)
-    nlc > 0 || error("nlc must be positive")
-    (nhp > 0 && iseven(nhp)) || error("nhp must be positive and even")
+    nlc > 0 || throw(ArgumentError("nlc must be positive"))
+    (nhp > 0 && iseven(nhp)) || throw(ArgumentError("nhp must be positive and even"))
     gt = falses(64 * cld(nlc, 64), nhp) # as a chunk in BitMatrix is 64-bit UInt64
     return Haplotype(nlc, nhp, gt)
 end

@@ -45,7 +45,7 @@ struct LocusSet
 end
 
 Base.length(ls::LocusSet) = length(ls.loci)
-Base.in(locus::Integer, ls::LocusSet) = locus in ls.loci
+Base.in(locus::Integer, ls::LocusSet) = insorted(locus, ls.loci)
 
 function Base.show(io::IO, ls::LocusSet)
     print(io, "LocusSet \"$(ls.name)\" with $(length(ls)) loci")

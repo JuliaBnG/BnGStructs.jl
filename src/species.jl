@@ -78,10 +78,10 @@ function GenericSpecies(
     chromosome::AbstractVector{<:Integer};
     M::Integer=100_000_000,
 )
-    nid ≤ 0 && error("nid must be positive")
-    isempty(chromosome) && error("at least one chromosome length is required")
-    all(chromosome .> 0) || error("chromosome lengths must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    isempty(chromosome) && throw(ArgumentError("at least one chromosome length is required"))
+    all(chromosome .> 0) || throw(ArgumentError("chromosome lengths must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     return GenericSpecies(String(name), Int32(nid), UInt32.(chromosome), UInt32(M))
 end
 
@@ -121,8 +121,8 @@ Autosomal chromosome lengths (29 autosomes) are sourced from NCBI assembly
 - `Cattle`: Initialized cattle species instance.
 """
 function Cattle(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         158_534_110,
         136_231_102,
@@ -194,8 +194,8 @@ Autosomal chromosome lengths (26 autosomes) are sourced from NCBI assembly
 - `Sheep`: Initialized sheep species instance.
 """
 function Sheep(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         275_406_953,
         248_966_461,
@@ -264,8 +264,8 @@ Autosomal chromosome lengths (39 autosomes) are sourced from NCBI assembly
 - `Chicken`: Initialized chicken species instance.
 """
 function Chicken(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         196_449_156,
         149_539_284,
@@ -349,8 +349,8 @@ Autosomal chromosome lengths (18 autosomes) are sourced from NCBI assembly
 - `Pig`: Initialized pig species instance.
 """
 function Pig(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         274_330_532,
         151_935_994,
@@ -412,8 +412,8 @@ Autosomal chromosome lengths (29 autosomes) are sourced from NCBI assembly
 - `Goat`: Initialized goat species instance.
 """
 function Goat(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         157_403_528,
         136_510_947,
@@ -484,8 +484,8 @@ Autosomal chromosome lengths (31 autosomes) are sourced from NCBI assembly
 - `Horse`: Initialized horse species instance.
 """
 function Horse(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         188_260_577,
         121_350_024,
@@ -559,8 +559,8 @@ Autosomal chromosome lengths (21 autosomes) are sourced from NCBI assembly
 - `Rabbit`: Initialized rabbit species instance.
 """
 function Rabbit(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         194_850_757,
         174_332_312,
@@ -624,8 +624,8 @@ Autosomal chromosome lengths (18 autosomes) are sourced from NCBI assembly
 - `Cat`: Initialized cat species instance.
 """
 function Cat(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         239_360_788,
         169_471_080,
@@ -686,8 +686,8 @@ Autosomal chromosome lengths (38 autosomes) are sourced from NCBI assembly
 - `Dog`: Initialized dog species instance.
 """
 function Dog(nid::Integer; M::Integer = 100_000_000)
-    nid ≤ 0 && error("nid must be positive")
-    M > 0 || error("M must be positive")
+    nid ≤ 0 && throw(ArgumentError("nid must be positive"))
+    M > 0 || throw(ArgumentError("M must be positive"))
     clng = [
         123_556_469,
         84_979_418,
@@ -733,7 +733,7 @@ function Dog(nid::Integer; M::Integer = 100_000_000)
     return Dog("CanFam", Int32(nid), UInt32.(clng), UInt32(M))
 end
 
-function Base.show(io::IO, c::Species)
+function Base.show(io::IO, ::MIME"text/plain", c::Species)
     println(io, lpad("Name: ", 17), c.name)
     println(io, lpad("Population size: ", 17), c.nid)
     println(io, lpad("Chromosome bp: ", 17))
@@ -876,3 +876,8 @@ M(sp) # 0x05f5e100 (100_000_000)
 """
 M(sp::Species) = sp.M
 Base.length(sp::Species) = length(sp.chromosome)
+
+Base.show(io::IO, c::Species) = print(
+    io, nameof(typeof(c)), " \"", c.name, "\" with ", length(c.chromosome),
+    " chromosomes and ", c.nid, " individuals",
+)

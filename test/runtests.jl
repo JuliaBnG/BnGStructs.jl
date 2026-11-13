@@ -1,6 +1,11 @@
 using BnGStructs
 using Test
 using Random
+using Aqua
+
+@testset "Aqua" begin
+    Aqua.test_all(BnGStructs)
+end
 
 @testset "Haplotype to Genotype and back" begin
     nlc, nid = rand(500:1000), rand(500:1000)
@@ -86,14 +91,14 @@ end
     @test cbp(gen) == UInt32[10_000_000, 30_000_000]
     @test gen.M == 50_000_000
 
-    @test_throws ErrorException GenericSpecies("Bad", -1, [1000])
-    @test_throws ErrorException GenericSpecies("Bad", 10, Int[])
-    @test_throws ErrorException GenericSpecies("Bad", 10, [0])
-    @test_throws ErrorException GenericSpecies("Bad", 10, [1000]; M=0)
+    @test_throws ArgumentError GenericSpecies("Bad", -1, [1000])
+    @test_throws ArgumentError GenericSpecies("Bad", 10, Int[])
+    @test_throws ArgumentError GenericSpecies("Bad", 10, [0])
+    @test_throws ArgumentError GenericSpecies("Bad", 10, [1000]; M=0)
 
     for constructor in (Cattle, Sheep, Chicken, Pig, Goat, Horse, Rabbit, Cat, Dog)
-        @test_throws ErrorException constructor(-1)
-        @test_throws ErrorException constructor(100; M=0)
+        @test_throws ArgumentError constructor(-1)
+        @test_throws ArgumentError constructor(100; M=0)
     end
 end
 
@@ -115,15 +120,21 @@ end
     @test Trait("IntegerWeights", [1, 2]) isa BnGStructs.tTrait
     Trait("UnchangedWeights", weights)
     @test weights == original_weights
-    @test_throws ErrorException Trait("OneCategory", [1.0])
-    @test_throws ErrorException Trait("InfiniteWeight", [Inf, 1.0])
-    @test_throws ErrorException Trait("InfiniteAge"; age=Inf)
-    @test_throws ErrorException Trait("InfiniteMean"; μ=Inf)
+    @test_throws ArgumentError Trait("OneCategory", [1.0])
+    @test_throws ArgumentError Trait("InfiniteWeight", [Inf, 1.0])
+    @test_throws ArgumentError Trait("InfiniteAge"; age=Inf)
+    @test_throws ArgumentError Trait("InfiniteMean"; μ=Inf)
 end
 
 @testset "Container display" begin
     @test sprint(show, Haplotype(10, 2)) == "Haplotype with 10 loci and 2 haplotypes"
     @test sprint(show, Genotype(10, 2)) == "Genotype with 10 individuals and 2 alleles"
+    # Compact forms stay on one line, so they print inside containers.
+    for x in (Cattle(10), SNPSet("chip", 5), Trait("milk"), Trait("mast", [0.9, 0.1]))
+        @test !occursin('\n', sprint(show, x))
+        @test occursin('\n', sprint(show, MIME("text/plain"), x))
+    end
+    @test 3 in LocusSet("s", [1, 3, 9]) && !(4 in LocusSet("s", [1, 3, 9]))
 end
 
 @testset "VariantMap and LocusSet" begin
