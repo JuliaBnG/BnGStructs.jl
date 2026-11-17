@@ -48,13 +48,13 @@ end
 end
 
 @testset "Species constructors and accessors" begin
-    cattle = Cattle(1000; M=80_000_000)
+    cattle = Cattle(; M=80_000_000)
     @test cattle isa Species
     @test cattle.name == "BosTau"
-    @test cattle.nid == 1000
+    @test !hasfield(Species, :nid)              # population size removed in 0.4
     @test BnGStructs.name(cattle) == "BosTau"
     @test !isdefined(@__MODULE__, :name) && !isdefined(@__MODULE__, :M)   # no longer exported
-    @test nid(cattle) == 1000
+    @test !isdefined(BnGStructs, :nid)
     @test chromosome(cattle) == cattle.chromosome
     @test BnGStructs.M(cattle) == 80_000_000
     @test length(cattle) == 29
@@ -62,61 +62,60 @@ end
     @test cbp(cattle) == cumsum(cattle.chromosome)
     @test cattle.M == 80_000_000
 
-    sheep = Sheep(500)
+    sheep = Sheep()
     @test sheep isa Species
     @test sheep.M == 100_000_000
 
-    chicken = Chicken(200; M=90_000_000)
+    chicken = Chicken(; M=90_000_000)
     @test chicken isa Species
     @test chicken.M == 90_000_000
 
-    pig = Pig(300)
+    pig = Pig()
     @test pig isa Species
-    goat = Goat(150)
+    goat = Goat()
     @test goat isa Species
-    horse = Horse(100)
+    horse = Horse()
     @test horse isa Species
-    rabbit = Rabbit(400)
+    rabbit = Rabbit()
     @test rabbit isa Species
-    cat = Cat(250)
+    cat = Cat()
     @test cat isa Species
-    dog = Dog(350)
+    dog = Dog()
     @test dog isa Species
 
-    gen = GenericSpecies("Custom", 500, [10_000_000, 20_000_000]; M=50_000_000)
+    gen = GenericSpecies("Custom", [10_000_000, 20_000_000]; M=50_000_000)
     @test gen isa Species
     @test gen.name == "Custom"
-    @test gen.nid == 500
     @test length(gen) == 2
     @test total_bp(gen) == 30_000_000
     @test cbp(gen) == UInt32[10_000_000, 30_000_000]
     @test gen.M == 50_000_000
 
-    # one concrete type, ends stored, genetic lengths, optional population size
+    # one concrete type, ends stored, genetic lengths
     @test isconcretetype(Species) && eltype([cattle, sheep, gen]) === Species
     @test cattle.ends === cbp(cattle)
     @test map_length(gen) == [0.2, 0.4]
     @test map_length(cattle) == cattle.chromosome ./ 80_000_000
     micro = GenericSpecies("Micro", [50_000_000, 5_000_000]; morgan = [0.5, 0.5])
-    @test map_length(micro) == [0.5, 0.5] && micro.nid == 0
-    @test_throws ArgumentError nid(micro)
-    @test Cattle().nid == 0 && Cattle().chromosome == cattle.chromosome
+    @test map_length(micro) == [0.5, 0.5]
+    @test Cattle().chromosome == cattle.chromosome
     @test map_length(Chicken(; morgan = max.(map_length(Chicken()), 0.5))) |> minimum == 0.5
     @test_throws ArgumentError GenericSpecies("Bad", [1000, 1000]; morgan = [0.1])
     @test_throws ArgumentError GenericSpecies("Bad", [1000, 1000]; morgan = [0.1, 0.0])
     @test_throws ArgumentError GenericSpecies("Big", fill(2_000_000_000, 3))
-    @test occursin("not set", sprint(show, MIME("text/plain"), micro))
-    old = GenericSpecies("Old", Int32(8), UInt32[100_000, 200_000], UInt32(50_000))
-    @test old.nid == 8 && old.M == 50_000 && map_length(old) == [2.0, 4.0]
+    @test !occursin("Population", sprint(show, MIME("text/plain"), micro))
+    @test map_length(GenericSpecies("Old", UInt32[100_000, 200_000]; M = 50_000)) == [2.0, 4.0]
+    # the forms with a population size are gone
+    @test_throws MethodError GenericSpecies("Old", Int32(8), UInt32[100_000, 200_000], UInt32(50_000))
+    @test_throws MethodError GenericSpecies("Bad", 10, [1000])
+    @test_throws MethodError Cattle(100)
 
-    @test_throws ArgumentError GenericSpecies("Bad", -1, [1000])
-    @test_throws ArgumentError GenericSpecies("Bad", 10, Int[])
-    @test_throws ArgumentError GenericSpecies("Bad", 10, [0])
-    @test_throws ArgumentError GenericSpecies("Bad", 10, [1000]; M=0)
+    @test_throws ArgumentError GenericSpecies("Bad", Int[])
+    @test_throws ArgumentError GenericSpecies("Bad", [0])
+    @test_throws ArgumentError GenericSpecies("Bad", [1000]; M=0)
 
     for constructor in (Cattle, Sheep, Chicken, Pig, Goat, Horse, Rabbit, Cat, Dog)
-        @test_throws ArgumentError constructor(-1)
-        @test_throws ArgumentError constructor(100; M=0)
+        @test_throws ArgumentError constructor(; M=0)
     end
 end
 
@@ -148,7 +147,7 @@ end
     @test sprint(show, Haplotype(10, 2)) == "Haplotype with 10 loci and 2 haplotypes"
     @test sprint(show, Genotype(10, 2)) == "Genotype with 10 individuals and 2 alleles"
     # Compact forms stay on one line, so they print inside containers.
-    for x in (Cattle(10), SNPSet("chip", 5), Trait("milk"), Trait("mast", [0.9, 0.1]))
+    for x in (Cattle(), SNPSet("chip", 5), Trait("milk"), Trait("mast", [0.9, 0.1]))
         @test !occursin('\n', sprint(show, x))
         @test occursin('\n', sprint(show, MIME("text/plain"), x))
     end
@@ -174,7 +173,7 @@ end
     @test sub_vm.pos == UInt32[100, 300, 1250]
 
     # Coordinate contract: genome-wide, strictly increasing positions
-    sp2 = GenericSpecies("Toy", 10, [1000, 1000])
+    sp2 = GenericSpecies("Toy", [1000, 1000])
     @test check_coordinates(vm, sp2)
     @test chrpos(vm, sp2) == UInt32[100, 200, 300, 150, 250]
     @test chrpos(vm, sp2, 4) == 150
@@ -200,7 +199,7 @@ end
     @test_throws ArgumentError VariantMap(chrs, pos, ref, alt; morgan = [0.0, 0.3, 0.2, 0.05, 0.1])
     @test_throws ArgumentError VariantMap(chrs, pos, ref, alt; morgan = [0.0, 0.1])
     @test occursin("genome-wide", sprint(show, MIME("text/plain"), gm))
-    @test_throws ArgumentError cbp(GenericSpecies("Big", 2, fill(2_000_000_000, 3)))
+    @test_throws ArgumentError cbp(GenericSpecies("Big", fill(2_000_000_000, 3)))
 
     # Locus sets (Chip markers, QTLs, Reference loci)
     chip = LocusSet("50kChip", [1, 2, 4])
@@ -349,7 +348,7 @@ end
         h2, p2 = read_haplotypes(f)
         @test h2 == hap && p2 == pos
         @test packed(h2) == packed(hap)
-        vm = VariantMap(pos, GenericSpecies("Toy", 5, [1000, 1000]))
+        vm = VariantMap(pos, GenericSpecies("Toy", [1000, 1000]))
         @test read(write_haplotypes(joinpath(dir, "b.bngh"), hap, vm)) == read(f)
         # the documented layout, byte by byte
         raw = read(f)

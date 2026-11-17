@@ -23,7 +23,7 @@ haplotypes = Haplotype(1_000, 200)
 genotypes = hap2id(haplotypes)
 
 # Built-in species metadata and trait definitions.
-cattle = Cattle(100)
+cattle = Cattle()
 milk_yield = Trait("MilkYield"; h²=0.3, σₐ=2.5)
 disease_risk = Trait("DiseaseRisk", [0.7, 0.2, 0.1]; h²=0.2)
 ```
@@ -56,10 +56,9 @@ lengths = max.(map_length(chicken), 0.5)
 chicken = Chicken(; morgan = lengths)
 ```
 
-A population size may still be passed as the first argument (`Cattle(1000)`)
-and read with `nid`, because FisherWright and BnGsim take it from there, but
-it is deprecated: a size belongs to a population, not to a species. The
-fields `name`, `chromosome` and `M` hold the rest of the metadata.
+A species carries no population size (removed in 0.4): a size belongs to
+a population, and FisherWright and BnGsim take it as their own argument.
+The fields `name`, `chromosome` and `M` hold the rest of the metadata.
 
 ## Traits
 
@@ -85,7 +84,7 @@ BnGsim's meiosis searches. Build a map from within-chromosome positions
 with a species, and recover them with `chrpos`:
 
 ```julia
-species = GenericSpecies("Example", 500, [10_000, 20_000])
+species = GenericSpecies("Example", [10_000, 20_000])
 map = VariantMap([1, 1, 2], [100, 200, 150], species)   # chr, position on the chromosome
 map.pos                                                # UInt32[100, 200, 10150]
 chrpos(map, species)                                   # UInt32[100, 200, 150]
