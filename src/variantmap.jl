@@ -45,7 +45,7 @@ species.
 ```julia
 using BnGStructs
 
-sp = GenericSpecies("Toy", 10, [5_000, 5_000])
+sp = GenericSpecies("Toy", [5_000, 5_000])
 # Variants at bases 1000 and 2000 of chromosome 1 and base 1500 of chromosome 2
 vm = VariantMap([1, 1, 2], [1000, 2000, 1500], sp)
 vm.pos           # UInt32[1000, 2000, 6500]

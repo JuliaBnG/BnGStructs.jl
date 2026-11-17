@@ -30,7 +30,6 @@ A continuous quantitative trait with purely additive genetic architecture.
 - `sex::Int`: Sex-limited expression: `0` for females (♀), `1` for males (♂), or `2` for both sexes.
 - `age::Float64`: Measurement age or developmental stage (non-negative).
 - `h²::Float64`: Narrow-sense heritability (`0 < h² ≤ 1`).
-- `QTL::Symbol`: Column name identifying corresponding QTL loci in a locus map.
 - `μ::Float64`: Population phenotypic mean.
 - `σₐ::Float64`: Additive genetic standard deviation (standard deviation of true breeding values, `σₐ > 0`).
 - `da::D`: Probability distribution used to sample QTL additive effect sizes (e.g., `Distributions.Normal()`).
@@ -42,7 +41,6 @@ struct aTrait{D<:Distribution} <: Trait
     sex::Int     # expressed in ♀(0), or ♂(1), or 2 for both sexes
     age::Float64 # age that trait is measured
     h²::Float64
-    QTL::Symbol  # QTL column name in lmp
     μ::Float64   # population mean
     σₐ::Float64  # TBV std
     da::D        # QTL additive effect distribution, e.g., Normal()
@@ -63,7 +61,6 @@ where `K = length(threshold)`.
 - `sex::Int`: Sex-limited expression: `0` for females (♀), `1` for males (♂), or `2` for both sexes.
 - `age::Float64`: Measurement age or developmental stage (non-negative).
 - `h²::Float64`: Narrow-sense heritability on the liability scale (`0 < h² ≤ 1`).
-- `QTL::Symbol`: Column name identifying corresponding QTL loci in a locus map.
 - `σₐ::Float64`: Additive genetic standard deviation on the liability scale (fixed at `1.0`).
 - `da::D`: Probability distribution used to sample QTL additive effect sizes on the liability scale.
 
@@ -75,7 +72,6 @@ struct tTrait{D<:Distribution} <: AbstractTrait
     sex::Int     # expressed in ♀(0), or ♂(1), 2 for both sexes
     age::Float64 # age that trait is measured
     h²::Float64  # narrow-sense heritability
-    QTL::Symbol
     σₐ::Float64  # TBV std
     da::D        # e.g., Normal()
 end
@@ -86,7 +82,6 @@ end
         sex = 2,
         age = 0.0,
         h² = 0.25,
-        QTL = :qtl,
         μ = 0.0,
         σₐ = 1.0,
         da = Normal(),
@@ -101,7 +96,6 @@ Construct a continuous additive quantitative trait ([`aTrait`](@ref)).
 - `sex`: Sex-limited expression: `0` for females (♀), `1` for males (♂), `2` for both (default: `2`).
 - `age`: Measurement age or stage (default: `0.0`, must be finite and `>= 0`).
 - `h²`: Narrow-sense heritability (default: `0.25`, must be in `(0, 1]`).
-- `QTL`: Symbol naming the QTL marker column in locus maps (default: `:qtl`).
 - `μ`: Population phenotypic mean (default: `0.0`, must be finite).
 - `σₐ`: Additive genetic standard deviation (default: `1.0`, must be finite and `> 0`).
 - `da`: Distribution of QTL additive effects (default: `Normal()`).
@@ -121,7 +115,6 @@ function Trait(
     sex = 2,
     age = 0.0,
     h² = 0.25,
-    QTL = :qtl,
     μ = 0.0,
     σₐ = 1.0,
     da = Normal(),
@@ -133,7 +126,7 @@ function Trait(
     isfinite(h²) && 0.0 < h² ≤ 1.0 || throw(ArgumentError("h² must be finite and in (0, 1]"))
     isfinite(μ) || throw(ArgumentError("μ must be finite"))
     isfinite(σₐ) && σₐ > 0 || throw(ArgumentError("σₐ must be finite and positive"))
-    aTrait(String(name), sex, Float64(age), Float64(h²), Symbol(QTL), Float64(μ), Float64(σₐ), da)
+    aTrait(String(name), sex, Float64(age), Float64(h²), Float64(μ), Float64(σₐ), da)
 end
 
 """
@@ -143,7 +136,6 @@ end
         sex = 2,
         age = 1.0,
         h² = 0.25,
-        QTL = :qtl,
         da = Normal(),
     ) -> tTrait
 
@@ -162,7 +154,6 @@ where phenotypic standard deviation `σₚ = sqrt(1 / h²)`.
 - `sex`: Sex-limited expression: `0` for females (♀), `1` for males (♂), `2` for both (default: `2`).
 - `age`: Measurement age or stage (default: `1.0`, must be finite and `>= 0`).
 - `h²`: Narrow-sense heritability on the liability scale (default: `0.25`, must be in `(0, 1]`).
-- `QTL`: Symbol naming the QTL marker column in locus maps (default: `:qtl`).
 - `da`: Distribution of QTL additive effects on the liability scale (default: `Normal()`).
 
 # Returns
@@ -187,7 +178,6 @@ function Trait(
     sex = 2,
     age = 1.0,
     h² = 0.25,
-    QTL = :qtl,
     da = Normal(),
 )
     occursin(r"^[[:alpha:]_\p{L}][\p{L}\p{N}_]*$", name) ||
@@ -207,7 +197,7 @@ function Trait(
         x -> quantile(Normal(0, σₚ), x),
         cumsum(normalized_weight[1:(end-1)]),
     )
-    tTrait(String(name), threshold, sex, Float64(age), Float64(h²), Symbol(QTL), 1.0, da)
+    tTrait(String(name), threshold, sex, Float64(age), Float64(h²), 1.0, da)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", trt::AbstractTrait)
@@ -225,7 +215,6 @@ function Base.show(io::IO, ::MIME"text/plain", trt::AbstractTrait)
     println(io, "      Express age: $(trt.age)")
     println(io, "     Heritability: $(trt.h²)")
     isa(trt, Trait) && println(io, "  Init. pop. mean: $(trt.μ)")
-    println(io, "     QTL set name: $(trt.QTL)")
     println(io, "         std(TBV): $(trt.σₐ)")
     println(io, " QTL add. distri.: $(trt.da)")
 end

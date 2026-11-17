@@ -31,7 +31,7 @@ gt = hap2id(hap)
 gtmat = gt.gt
 
 # Define a Cattle population
-cattle = Cattle(1000)
+cattle = Cattle()
 
 # Define a continuous trait
 milk_yield = Trait("MilkYield"; h²=0.3)

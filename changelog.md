@@ -2,7 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.3.0 (unreleased)
+## v0.4.0 (2026-11-17)
+
+Second tranche of the coordinated contract changes (M1). Breaking.
+
+### Removed
+
+- `Species.nid`, the population size stored in a species (deprecated in
+  0.3), with every way to set or read it: the size argument of
+  `Species(name, nid, chromosome)`, `GenericSpecies(name, nid,
+  chromosome[, M])` and the named species (`Cattle(nid)`, …), and the
+  accessor `nid(sp)`. A size belongs to a population: FisherWright takes
+  it as `fisher_wright(sp, ne, nt[, mr])` (0.8.1 and later), BnGsim as
+  `HistoricalSpec(name, sp, ne, nt, mr)`.
+- `aTrait.QTL` and `tTrait.QTL` and the keyword `QTL` of `Trait(...)`: a
+  column name from the retired locus-map `DataFrame` design, read by no
+  package.
+
+### Migration
+
+- `Cattle(1000)` → `Cattle()`; `GenericSpecies("x", 500, lengths)` →
+  `GenericSpecies("x", lengths)`; `GenericSpecies("x", n, lengths, M)` →
+  `GenericSpecies("x", lengths; M = M)`; pass the size where it is used.
+- `Trait("y"; QTL = :q, ...)` → `Trait("y"; ...)`.
+
+## 0.3.0 (2026-11-13)
 
 Breaking release: the contracts that FisherWright, RelationshipMatrices,
 Breeding and BnGsim rely on are now written down and enforced.
